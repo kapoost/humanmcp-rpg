@@ -924,8 +924,16 @@ function renderMenu() {
   // header box
   drawBox(10, 8, BASE_W - 20, 40);
 
-  const persona = PERSONAS[0]; // show connected server persona
-  drawFace(persona.id, 18, 14, 28);
+  // server icon — author initial in colored circle
+  ctx.fillStyle = COLORS.dialogBg;
+  ctx.fillRect(18, 14, 28, 28);
+  ctx.strokeStyle = COLORS.dialogBorder;
+  ctx.strokeRect(18, 14, 28, 28);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = COLORS.textHighlight;
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.fillText(AUTHOR.name.charAt(0).toUpperCase(), 32, 33);
+  ctx.textAlign = 'left';
   drawText('humanMCP', 52, 27, COLORS.textHighlight, 12);
   drawText(state.serverUrl.replace('https://', '').replace('/mcp', ''), 52, 40, COLORS.textDisabled, 8);
 
@@ -965,26 +973,62 @@ function renderMenu() {
   // team preview panel
   const panelX = 180;
   const panelW = BASE_W - 190;
-  drawBox(panelX, menuY, panelW, BASE_H - menuY - 8);
+  const panelH = BASE_H - menuY - 8;
+  drawBox(panelX, menuY, panelW, panelH);
 
   drawText('Party', panelX + 10, menuY + 18, COLORS.textHighlight, 10);
+  drawText(`${PERSONAS.length}`, panelX + panelW - 24, menuY + 18, COLORS.textDisabled, 8);
 
-  // show 6 personas in grid
+  // persona grid with scroll
   const cols = 3;
-  const faceSize = 40;
-  const gap = 8;
-  const startX = panelX + 15;
-  const startY = menuY + 28;
+  const faceSize = 36;
+  const cellW = Math.floor((panelW - 24) / cols);
+  const cellH = faceSize + 16;
+  const startX = panelX + 12;
+  const startY = menuY + 26;
+  const visibleH = panelH - 34;
+  const totalRows = Math.ceil(PERSONAS.length / cols);
+  const totalH = totalRows * cellH;
+  const maxScroll = Math.max(0, totalH - visibleH);
 
-  PERSONAS.slice(0, 12).forEach((p, i) => {
+  // gentle auto-scroll through party grid
+  if (maxScroll > 0) {
+    if (!state._menuPartyScroll) state._menuPartyScroll = 0;
+    if (!state._menuScrollDir) state._menuScrollDir = 1;
+    state._menuPartyScroll += state._menuScrollDir * 0.15;
+    if (state._menuPartyScroll >= maxScroll) { state._menuPartyScroll = maxScroll; state._menuScrollDir = -1; }
+    if (state._menuPartyScroll <= 0) { state._menuPartyScroll = 0; state._menuScrollDir = 1; }
+  }
+  const scroll = state._menuPartyScroll || 0;
+
+  // clip to panel
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(panelX + 2, startY, panelW - 4, visibleH);
+  ctx.clip();
+
+  PERSONAS.forEach((p, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const fx = startX + col * (faceSize + gap + 40);
-    const fy = startY + row * (faceSize + gap + 8);
+    const fx = startX + col * cellW;
+    const fy = startY + row * cellH - scroll;
 
-    drawFace(p.id, fx, fy, faceSize);
-    drawText(p.name.split(' ')[0], fx, fy + faceSize + 8, p.color, 7);
+    // skip if outside visible area
+    if (fy + cellH < startY || fy > startY + visibleH) return;
+
+    drawFace(p.id, fx, fy + 2, faceSize);
+    drawText(p.name.split(' ')[0], fx, fy + faceSize + 12, p.color, 7);
   });
+
+  ctx.restore();
+
+  // scroll indicator arrows
+  if (scroll > 0) {
+    drawText('▲', panelX + panelW / 2 - 4, startY + 6, COLORS.dialogBorder, 8);
+  }
+  if (scroll < maxScroll) {
+    drawText('▼', panelX + panelW / 2 - 4, startY + visibleH - 2, COLORS.dialogBorder, 8);
+  }
 
   // status bar at bottom
   drawBox(10, BASE_H - 28, BASE_W - 20, 22);
@@ -1064,6 +1108,14 @@ function renderTeam() {
       drawCursor(listX + 6, iy);
     }
     drawText(p.name.split(' ')[0], listX + 20, iy, selected ? COLORS.textHighlight : COLORS.text, 9);
+  }
+
+  // scroll indicators
+  if (scrollOffset > 0) {
+    drawText('▲', listX + listW / 2 - 4, listY + 6, COLORS.dialogBorder, 7);
+  }
+  if (scrollOffset + visibleCount < PERSONAS.length) {
+    drawText('▼', listX + listW / 2 - 4, listY + visibleCount * 22 + 10, COLORS.dialogBorder, 7);
   }
 
   // detail panel
