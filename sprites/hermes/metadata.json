@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "a8f5e47e-cf90-45fa-b015-e80544d2f341",
+    "name": "Hermes",
+    "prompt": "Man with beard, white shirt rolled sleeves, business casual. Consultant. Pixel art chibi.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:59:20.090558+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:51.759838"
+}

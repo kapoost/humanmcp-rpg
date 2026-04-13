@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "192b4546-a877-4d5e-8a44-669e03d24a62",
+    "name": "Zara",
+    "prompt": "Witch girl. Anime pixel art.",
+    "size": {
+      "width": 92,
+      "height": 92
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-13T14:20:06.552448+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:21:28.409642"
+}

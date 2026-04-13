@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "186cda3c-695a-4df9-962d-10613f995ca9",
+    "name": "Ghost",
+    "prompt": "Mysterious hooded male figure, dark hoodie pulled up, face in shadow with only eyes visible, green glow from below, hacker aesthetic. Pixel art RPG style.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:57:53.029743+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:50.333993"
+}

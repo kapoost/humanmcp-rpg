@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "b334ffce-4702-4d06-af93-cff80b50ba4d",
+    "name": "Tomas Reyes",
+    "prompt": "Latino man, short dark curly hair, lab coat over casual t-shirt, holding tablet. Scientist. Pixel art RPG style.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:58:36.671369+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:58.994018"
+}

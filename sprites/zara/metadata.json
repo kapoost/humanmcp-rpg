@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "1aeace4d-4a43-4242-a1f8-f1b332b641a7",
+    "name": "Zara",
+    "prompt": "Cute girl wizard with purple robe and big hat. Pixel art chibi.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T14:00:53.420276+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:03:00.227636"
+}

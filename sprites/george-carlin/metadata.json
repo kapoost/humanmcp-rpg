@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "5df87ee7-8a5b-4135-aadf-707fe6eb8804",
+    "name": "George Carlin",
+    "prompt": "Older American man, grey curly hair, dark eyes, cynical smirk, wearing black t-shirt and jeans. Stand-up comedian look. FF7 PS1 style.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:56:09.059696+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:48.317610"
+}

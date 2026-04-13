@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "b09d4740-39c9-4f57-bb0b-49bc398cc435",
+    "name": "Kenji Mori",
+    "prompt": "Old Japanese man, white hair, blue mechanic coveralls, wrench. Kind face. Pixel art chibi.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:59:34.828364+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:56.943753"
+}

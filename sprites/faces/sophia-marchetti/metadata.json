@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "b5a0ff1d-e7d6-49db-8d1a-6e1dd2a51e0f",
+    "name": "Sophia Marchetti Face",
+    "prompt": "Elegant woman in red dress with dark hair. Anime pixel art portrait.",
+    "size": {
+      "width": 92,
+      "height": 92
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-13T14:18:58.970686+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:21:26.657469"
+}

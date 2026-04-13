@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "b6e8af9d-42e5-4abe-a596-5f1025f00b3c",
+    "name": "Lukasz Mazur",
+    "prompt": "Polish male philosopher, dark brown hair, thoughtful expression, wearing tweed jacket with elbow patches, holding a book. FF7 PS1 style.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:56:09.223491+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:48.999748"
+}

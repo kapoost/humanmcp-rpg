@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "27640f9a-33c6-44e9-b945-e5d8de6ca88c",
+    "name": "Mira Chen Face",
+    "prompt": "Female ninja with ponytail. Anime pixel art portrait.",
+    "size": {
+      "width": 92,
+      "height": 92
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-13T14:18:52.605591+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:21:25.990931"
+}

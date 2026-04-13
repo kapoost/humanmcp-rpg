@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "6019d9ac-b4b6-4c13-98f2-3e30b43ad02a",
+    "name": "Eleanor Voss",
+    "prompt": "Older woman, silver hair in neat bun, sharp eyes, dark turtleneck, reading glasses on chain. Designer and architect. Pixel art RPG style.",
+    "size": {
+      "width": 68,
+      "height": 68
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "low top-down",
+    "created_at": "2026-04-13T13:58:20.38155+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:02:49.768668"
+}

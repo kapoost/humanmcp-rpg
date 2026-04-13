@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "d857cbad-618c-454c-bd3c-d64b67348dcc",
+    "name": "Lukasz Mazur Face",
+    "prompt": "Portrait headshot of man with brown hair and tweed jacket, thoughtful look. Anime manga style, big expressive eyes. RPG dialog portrait.",
+    "size": {
+      "width": 92,
+      "height": 92
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-13T14:05:54.636499+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-13T14:21:10.140066"
+}
