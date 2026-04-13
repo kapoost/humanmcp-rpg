@@ -90,6 +90,15 @@ const PERSONAS = [
     desc: 'Chaos testing, edge cases, impossible scenarios. Entropy is her ally.' },
 ];
 
+// ── Face Sprite Remap ──
+// Some PixelLab sprites better match different personas visually
+const FACE_REMAP = {
+  'kenji-mori': 'lukasz-mazur',     // tweed intellectual → Data Engineer
+  'lukasz-mazur': 'kenji-mori',     // mechanic overalls → Car Expert
+  'axel-brandt': 'tomas-reyes',     // curly-haired dev → DevOps
+  'tomas-reyes': 'axel-brandt',     // lab coat scientist → Frontend Dev
+};
+
 // ── Skills Data ──
 
 const SKILLS = [
@@ -317,7 +326,8 @@ function loadFaces() {
     img.onerror = () => {
       state.facesLoaded++;
     };
-    img.src = `sprites/faces/${p.id}.png`;
+    const spriteId = FACE_REMAP[p.id] || p.id;
+    img.src = `sprites/faces/${spriteId}.png`;
   });
 }
 
@@ -450,7 +460,9 @@ function drawCursor(x, y) {
 function drawFace(personaId, x, y, size = 48) {
   const img = state.faces[personaId];
   if (img) {
-    ctx.drawImage(img, x, y, size, size);
+    // crop: show top 60% of sprite (head + shoulders, cut legs)
+    const cropH = Math.floor(img.height * 0.6);
+    ctx.drawImage(img, 0, 0, img.width, cropH, x, y, size, size);
     // border around face
     ctx.strokeStyle = COLORS.dialogBorder;
     ctx.lineWidth = 1;
