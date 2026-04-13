@@ -263,6 +263,8 @@ const state = {
   readingSlug: null,
   readingScroll: 0,
   skillsCursor: 0,
+  aboutTab: 0,
+  aboutScroll: 0,
   serverUrl: '',
   connected: false,
   inputActive: false,
@@ -999,62 +1001,190 @@ function renderSkills() {
 
 // ── About Scene ──
 
-function renderAbout() {
-  // header
-  drawBox(10, 8, BASE_W - 20, 24);
-  drawText('About', 20, 24, COLORS.textHighlight, 11);
+const ABOUT_TABS = ['Profile', 'Agent Guide'];
+const AGENT_GUIDE = [
+  { cmd: 'get_author_profile', hint: 'Start here — who is kapoost', prompt: '"Tell me about kapoost"' },
+  { cmd: 'list_content', hint: 'Browse poems, essays, notes', prompt: '"Show me what kapoost wrote"' },
+  { cmd: 'read_content {slug}', hint: 'Read a piece in full', prompt: '"Read the poem Suma czlowieczenstwa"' },
+  { cmd: 'verify_content {slug}', hint: 'Check Ed25519 signature', prompt: '"Verify this poem is authentic"' },
+  { cmd: 'list_personas', hint: 'See the team roster', prompt: '"Who is on kapoost\'s team?"' },
+  { cmd: 'bootstrap_session', hint: 'Unlock full context (code needed)', prompt: '"Bootstrap session, code: <code>"' },
+  { cmd: 'list_skills', hint: 'Browse skill catalog', prompt: '"What skills does kapoost have?"' },
+  { cmd: 'query_vault', hint: 'Search kapoost\'s memory/RAG', prompt: '"Search vault for sailing notes"' },
+  { cmd: 'leave_comment {slug}', hint: 'React to a piece', prompt: '"Tell kapoost I liked his poem"' },
+  { cmd: 'leave_message', hint: 'Send a note to kapoost', prompt: '"Send kapoost a message"' },
+  { cmd: 'get_certificate {slug}', hint: 'Bitcoin timestamp proof', prompt: '"Show the timestamp proof"' },
+  { cmd: 'request_access {slug}', hint: 'Unlock gated content', prompt: '"How do I unlock private contact?"' },
+];
 
-  // portrait + name card
+function renderAbout() {
+  // header with tabs
+  drawBox(10, 8, BASE_W - 20, 24);
+  ABOUT_TABS.forEach((tab, i) => {
+    const tx = 20 + i * 120;
+    const selected = state.aboutTab === i;
+    if (selected) {
+      drawText(tab, tx, 24, COLORS.textHighlight, 11);
+      // underline
+      ctx.fillStyle = COLORS.textHighlight;
+      ctx.fillRect(tx, 27, ctx.measureText(tab).width || 50, 2);
+    } else {
+      drawText(tab, tx, 24, COLORS.textDisabled, 11);
+    }
+  });
+
   const cardX = 10;
   const cardY = 40;
   const cardW = BASE_W - 20;
-  drawBox(cardX, cardY, cardW, 100);
+  const areaH = BASE_H - cardY - 36;
 
-  // face - use mira-chen as kapoost representative or first available
-  drawFace('mira-chen', cardX + 14, cardY + 10, 56);
+  if (state.aboutTab === 0) {
+    renderAboutProfile(cardX, cardY, cardW, areaH);
+  } else {
+    renderAboutGuide(cardX, cardY, cardW, areaH);
+  }
 
-  // name and roles
-  drawText(AUTHOR.name, cardX + 82, cardY + 22, COLORS.textHighlight, 14);
+  // controls
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('←→ Tab   ↑↓ Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
+function renderAboutProfile(cardX, cardY, cardW, areaH) {
+  drawBox(cardX, cardY, cardW, areaH);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(cardX + 2, cardY + 2, cardW - 4, areaH - 4);
+  ctx.clip();
+
+  const scroll = state.aboutScroll || 0;
+  let y = cardY + 16 - scroll;
+
+  // face + name
+  drawFace('mira-chen', cardX + 14, y - 2, 48);
+  drawText(AUTHOR.name, cardX + 72, y + 10, COLORS.textHighlight, 14);
   AUTHOR.roles.forEach((role, i) => {
-    drawText(role, cardX + 82 + i * 0, cardY + 38 + i * 13, COLORS.dialogBorder, 9);
+    drawText(role, cardX + 72, y + 26 + i * 12, COLORS.dialogBorder, 9);
   });
+  y += 60;
+
+  // separator
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.beginPath(); ctx.moveTo(cardX + 12, y); ctx.lineTo(cardX + cardW - 16, y); ctx.stroke();
+  y += 10;
 
   // bio
-  const bioY = cardY + 108;
-  drawBox(cardX, bioY, cardW, 70);
-  drawTextWrapped(AUTHOR.bio, cardX + 12, bioY + 16, cardW - 28, COLORS.text, 12);
+  y = drawTextWrapped(AUTHOR.bio, cardX + 14, y, cardW - 32, COLORS.text, 12) + 18;
 
-  // stats grid
-  const gridY = bioY + 78;
-  drawBox(cardX, gridY, cardW, 50);
+  // stats
   const statItems = [
     { label: 'Pieces', val: AUTHOR.stats.pieces, color: COLORS.hpGreen },
     { label: 'Locked', val: AUTHOR.stats.locked, color: COLORS.textHighlight },
     { label: 'Skills', val: AUTHOR.stats.skills, color: COLORS.mpBlue },
     { label: 'Personas', val: AUTHOR.stats.personas, color: '#cc88ff' },
   ];
-  const colW = Math.floor(cardW / 4);
+  const colW = Math.floor((cardW - 20) / 4);
   statItems.forEach((s, i) => {
-    const sx = cardX + i * colW + colW / 2;
+    const sx = cardX + 10 + i * colW + colW / 2;
     ctx.textAlign = 'center';
-    drawText(String(s.val), sx, gridY + 20, s.color, 16);
-    drawText(s.label, sx, gridY + 36, COLORS.textDisabled, 8);
+    drawText(String(s.val), sx, y, s.color, 16);
+    drawText(s.label, sx, y + 14, COLORS.textDisabled, 8);
     ctx.textAlign = 'left';
   });
+  y += 30;
+
+  // separator
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.beginPath(); ctx.moveTo(cardX + 12, y); ctx.lineTo(cardX + cardW - 16, y); ctx.stroke();
+  y += 12;
 
   // motto
-  const mottoY = gridY + 58;
-  drawBox(cardX, mottoY, cardW, 28);
   ctx.textAlign = 'center';
-  drawText(`"${AUTHOR.motto}"`, BASE_W / 2, mottoY + 18, COLORS.dialogBorder, 8);
+  drawText(`"${AUTHOR.motto}"`, BASE_W / 2, y, COLORS.dialogBorder, 8);
   ctx.textAlign = 'left';
+  y += 16;
 
-  // server info
-  drawText(`MCP: ${AUTHOR.server}`, cardX + 8, BASE_H - 38, COLORS.textDisabled, 7);
+  // server
+  drawText(`MCP: ${AUTHOR.server}`, cardX + 14, y, COLORS.textDisabled, 7);
+  y += 14;
 
-  // controls
-  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-  drawText('ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  state._aboutMaxScroll = Math.max(0, y + scroll - cardY - areaH + 10);
+  ctx.restore();
+}
+
+function renderAboutGuide(cardX, cardY, cardW, areaH) {
+  drawBox(cardX, cardY, cardW, areaH);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(cardX + 2, cardY + 2, cardW - 4, areaH - 4);
+  ctx.clip();
+
+  const scroll = state.aboutScroll || 0;
+  let y = cardY + 16 - scroll;
+
+  drawText('How to talk to a humanMCP server', cardX + 14, y, COLORS.textHighlight, 10);
+  y += 6;
+  drawTextWrapped('Connect your agent (Claude Code, Claude Desktop, or any MCP client) to the server URL. Then use natural language — the agent will call the right tools.', cardX + 14, y + 8, cardW - 32, COLORS.textDisabled, 11);
+  y += 48;
+
+  // separator
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.beginPath(); ctx.moveTo(cardX + 12, y); ctx.lineTo(cardX + cardW - 16, y); ctx.stroke();
+  y += 10;
+
+  drawText('MCP Tool', cardX + 14, y, COLORS.dialogBorder, 8);
+  drawText('Try saying...', cardX + 240, y, COLORS.dialogBorder, 8);
+  y += 14;
+
+  AGENT_GUIDE.forEach((item, i) => {
+    const rowY = y + i * 32;
+    // alternating bg
+    if (i % 2 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      ctx.fillRect(cardX + 6, rowY - 6, cardW - 16, 30);
+    }
+
+    drawText(item.cmd, cardX + 14, rowY, COLORS.hpGreen, 8);
+    drawText(item.hint, cardX + 14, rowY + 12, COLORS.textDisabled, 7);
+    drawTextWrapped(item.prompt, cardX + 240, rowY + 4, cardW - 260, COLORS.textHighlight, 8);
+  });
+
+  y += AGENT_GUIDE.length * 32 + 10;
+
+  // separator
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.beginPath(); ctx.moveTo(cardX + 12, y); ctx.lineTo(cardX + cardW - 16, y); ctx.stroke();
+  y += 12;
+
+  drawText('Quick start:', cardX + 14, y, COLORS.textHighlight, 9);
+  y += 14;
+  const steps = [
+    '1. Connect agent to MCP URL',
+    '2. "Tell me about kapoost"',
+    '3. "Show me his poems"',
+    '4. "Read Suma czlowieczenstwa"',
+    '5. "What did you think?" → leave_comment',
+  ];
+  steps.forEach((step, i) => {
+    drawText(step, cardX + 14, y + i * 13, i === 4 ? COLORS.dialogBorder : COLORS.text, 9);
+  });
+  y += steps.length * 13 + 10;
+
+  state._aboutMaxScroll = Math.max(0, y + scroll - cardY - areaH + 10);
+  ctx.restore();
+
+  // scroll indicator
+  if (state._aboutMaxScroll > 0) {
+    const scrollPct = scroll / state._aboutMaxScroll;
+    const barH = areaH - 8;
+    const thumbH = Math.max(10, barH * (areaH / (areaH + state._aboutMaxScroll)));
+    const thumbY = cardY + 4 + scrollPct * (barH - thumbH);
+    ctx.fillStyle = COLORS.dialogBorderInner;
+    ctx.fillRect(cardX + cardW - 8, cardY + 4, 3, barH);
+    ctx.fillStyle = COLORS.dialogBorder;
+    ctx.fillRect(cardX + cardW - 8, thumbY, 3, thumbH);
+  }
 }
 
 // ── MCP Connection ──
@@ -1152,6 +1282,12 @@ function handleKey(e) {
       playSfx('cursor');
       handleDown();
       break;
+    case 'ArrowLeft':
+      handleLeft();
+      break;
+    case 'ArrowRight':
+      handleRight();
+      break;
     case 'Escape':
       playSfx('back');
       handleBack();
@@ -1242,6 +1378,8 @@ function handleMenuSelect() {
       break;
     case 5: // About
       state.scene = 'about';
+      state.aboutTab = 0;
+      state.aboutScroll = 0;
       break;
     case 6: // Disconnect
       state.connected = false;
@@ -1268,6 +1406,9 @@ function handleUp() {
     case 'skills':
       state.skillsCursor = Math.max(0, state.skillsCursor - 1);
       break;
+    case 'about':
+      state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
+      break;
   }
 }
 
@@ -1288,6 +1429,25 @@ function handleDown() {
     case 'skills':
       state.skillsCursor = Math.min(SKILLS.length - 1, state.skillsCursor + 1);
       break;
+    case 'about':
+      state.aboutScroll = Math.min(state._aboutMaxScroll || 0, (state.aboutScroll || 0) + 20);
+      break;
+  }
+}
+
+function handleLeft() {
+  if (state.scene === 'about') {
+    playSfx('cursor');
+    state.aboutTab = Math.max(0, state.aboutTab - 1);
+    state.aboutScroll = 0;
+  }
+}
+
+function handleRight() {
+  if (state.scene === 'about') {
+    playSfx('cursor');
+    state.aboutTab = Math.min(ABOUT_TABS.length - 1, state.aboutTab + 1);
+    state.aboutScroll = 0;
   }
 }
 
