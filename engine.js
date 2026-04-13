@@ -390,23 +390,45 @@ function render() {
 
 // ── Drawing Helpers ──
 
-function drawBox(x, y, w, h) {
-  // FF7 gradient box
+function drawBox(x, y, w, h, r = 6) {
+  // FF7 gradient box with rounded corners
   const grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, COLORS.dialogBg1);
   grad.addColorStop(1, COLORS.dialogBg2);
+
+  // fill
+  ctx.beginPath();
+  roundRect(ctx, x + 2, y + 2, w - 4, h - 4, r - 1);
   ctx.fillStyle = grad;
-  ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+  ctx.fill();
 
   // outer border
+  ctx.beginPath();
+  roundRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
   ctx.strokeStyle = COLORS.dialogBorder;
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  ctx.stroke();
 
   // inner border
+  ctx.beginPath();
+  roundRect(ctx, x + 3, y + 3, w - 6, h - 6, r - 2);
   ctx.strokeStyle = COLORS.dialogBorderInner;
   ctx.lineWidth = 1;
-  ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+  ctx.stroke();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 function drawText(text, x, y, color = COLORS.text, size = 10) {
@@ -455,13 +477,23 @@ function drawCursor(x, y) {
   }
 }
 
-function drawFace(personaId, x, y, size = 48) {
+function drawFace(personaId, x, y, size = 48, full = false) {
   const img = state.faces[personaId];
   if (img) {
-    // crop: show top 60% of sprite (head + shoulders, cut legs)
-    const cropH = Math.floor(img.height * 0.6);
-    ctx.drawImage(img, 0, 0, img.width, cropH, x, y, size, size);
-    // border around face
+    if (full) {
+      // show entire sprite, fit to box preserving aspect ratio
+      const scale = Math.min(size / img.width, size / img.height);
+      const dw = Math.floor(img.width * scale);
+      const dh = Math.floor(img.height * scale);
+      const dx = x + Math.floor((size - dw) / 2);
+      const dy = y + Math.floor((size - dh) / 2);
+      ctx.drawImage(img, dx, dy, dw, dh);
+    } else {
+      // crop: show top 60% of sprite (head + shoulders, cut legs)
+      const cropH = Math.floor(img.height * 0.6);
+      ctx.drawImage(img, 0, 0, img.width, cropH, x, y, size, size);
+    }
+    // border
     ctx.strokeStyle = COLORS.dialogBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, size, size);
@@ -696,7 +728,7 @@ function renderTeam() {
   if (sel) {
     // face
     const faceSize = 56;
-    drawFace(sel.id, detailX + 12, listY + 10, faceSize);
+    drawFace(sel.id, detailX + 12, listY + 10, faceSize, true);
 
     // name + role + level
     const infoX = detailX + 12 + faceSize + 10;
