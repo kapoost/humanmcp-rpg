@@ -415,6 +415,11 @@ function init() {
   // load faces
   loadFaces();
 
+  // load author avatar
+  const authorImg = new Image();
+  authorImg.onload = () => { state.faces['kapoost'] = authorImg; };
+  authorImg.src = 'sprites/faces/kapoost.png';
+
   // mobile touch controls
   if (isMobile) {
     const touchControls = document.getElementById('touch-controls');
@@ -1002,13 +1007,7 @@ function renderMenu() {
   drawBox(10, 8, BASE_W - 20, 40);
 
   // author avatar in header
-  const hdrAvatar = generateAuthorAvatar();
-  const hdrScale = Math.min(28 / hdrAvatar.width, 28 / hdrAvatar.height);
-  const hdrW = Math.floor(hdrAvatar.width * hdrScale);
-  const hdrH = Math.floor(hdrAvatar.height * hdrScale);
-  ctx.drawImage(hdrAvatar, 18 + (28 - hdrW) / 2, 14 + (28 - hdrH) / 2, hdrW, hdrH);
-  ctx.strokeStyle = COLORS.dialogBorder;
-  ctx.strokeRect(18, 14, 28, 28);
+  drawFace('kapoost', 18, 14, 28, true);
   drawText('humanMCP', 52, 27, COLORS.textHighlight, 12);
   drawText(state.serverUrl.replace('https://', '').replace('/mcp', ''), 52, 40, COLORS.textDisabled, 8);
 
@@ -1577,13 +1576,7 @@ function renderAboutProfile(cardX, cardY, cardW, areaH) {
   let y = cardY + 16 - scroll;
 
   // face + name
-  const authorAvatar = generateAuthorAvatar();
-  const avScale = Math.min(48 / authorAvatar.width, 48 / authorAvatar.height);
-  const avW = Math.floor(authorAvatar.width * avScale);
-  const avH = Math.floor(authorAvatar.height * avScale);
-  ctx.drawImage(authorAvatar, cardX + 14 + (48 - avW) / 2, y - 2 + (48 - avH) / 2, avW, avH);
-  ctx.strokeStyle = COLORS.dialogBorder;
-  ctx.strokeRect(cardX + 14, y - 2, 48, 48);
+  drawFace('kapoost', cardX + 14, y - 2, 48, true);
   drawText(AUTHOR.name, cardX + 72, y + 10, COLORS.textHighlight, 14);
   AUTHOR.roles.forEach((role, i) => {
     drawText(role, cardX + 72, y + 26 + i * 12, COLORS.dialogBorder, 9);
