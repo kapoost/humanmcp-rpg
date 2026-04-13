@@ -2185,7 +2185,12 @@ async function searchVault(query) {
   const result = await mcpCall('query_vault', { query });
   state.vaultLoading = false;
   if (result) {
-    state.vaultResults = result;
+    // check for backend errors and show friendly message
+    if (result.includes('niedostępna') || result.includes('offline') || result.includes('no such host') || result.includes('dial tcp')) {
+      state.vaultResults = 'Vault backend is offline. The author\'s local knowledge base is not currently running.';
+    } else {
+      state.vaultResults = result;
+    }
   } else {
     state.vaultResults = 'Vault unavailable. Start proxy: node proxy.js';
   }
