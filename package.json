@@ -1,0 +1,13 @@
+{
+  "name": "humanmcp-rpg",
+  "version": "0.1.0",
+  "description": "jRPG-styled client for humanMCP servers",
+  "type": "module",
+  "scripts": {
+    "proxy": "node proxy.js",
+    "dev": "node proxy.js & python3 -m http.server 8080",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": ["humanmcp", "mcp", "rpg", "pixel-art"],
+  "license": "MIT"
+}

@@ -6,6 +6,7 @@ const ctx = canvas.getContext('2d');
 
 // ── Config ──
 
+const PROXY_URL = 'http://localhost:3001';
 const SCALE = 2;
 const BASE_W = 480;
 const BASE_H = 320;
@@ -272,6 +273,12 @@ const state = {
   skillsCursor: 0,
   aboutTab: 0,
   aboutScroll: 0,
+  vaultQuery: '',
+  vaultResults: null,
+  vaultLoading: false,
+  messageText: '',
+  messageSent: false,
+  proxyAvailable: false,
   serverUrl: '',
   connected: false,
   inputActive: false,
@@ -385,6 +392,8 @@ function render() {
     case 'reading': renderReading(); break;
     case 'skills': renderSkills(); break;
     case 'about': renderAbout(); break;
+    case 'vault': renderVault(); break;
+    case 'message': renderMessage(); break;
   }
 }
 
@@ -1229,27 +1238,159 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
   }
 }
 
+// ── Vault Scene ──
+
+function renderVault() {
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Vault', 20, 24, COLORS.textHighlight, 11);
+  drawText('query kapoost\'s memory', BASE_W - 200, 24, COLORS.textDisabled, 8);
+
+  // search box
+  drawBox(10, 40, BASE_W - 20, 36);
+  drawText('Search:', 20, 62, COLORS.dialogBorder, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(72, 50, BASE_W - 100, 18);
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.strokeRect(72, 50, BASE_W - 100, 18);
+  const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+  drawText(state.vaultQuery + cursor, 76, 63, COLORS.text, 9);
+
+  // results
+  const resultY = 84;
+  drawBox(10, resultY, BASE_W - 20, BASE_H - resultY - 36);
+
+  if (state.vaultLoading) {
+    drawText('Searching...', 24, resultY + 20, COLORS.textDisabled);
+    // spinning dots
+    const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
+    drawText(dots, 100, resultY + 20, COLORS.textHighlight);
+  } else if (state.vaultResults === null) {
+    drawText('Type a query and press Enter to search', 24, resultY + 20, COLORS.textDisabled);
+    drawText('Examples: "sailing", "deployment", "MX-5"', 24, resultY + 36, COLORS.textDisabled, 8);
+  } else if (state.vaultResults === '') {
+    drawText('No results found.', 24, resultY + 20, COLORS.textDisabled);
+  } else {
+    // show results with word wrap and scroll
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(12, resultY + 2, BASE_W - 24, BASE_H - resultY - 40);
+    ctx.clip();
+    drawTextWrapped(state.vaultResults, 24, resultY + 18 - (state.aboutScroll || 0), BASE_W - 52, COLORS.text, 12);
+    ctx.restore();
+  }
+
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('Type query   ENTER Search   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
+// ── Message Scene ──
+
+function renderMessage() {
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Send Message to kapoost', 20, 24, COLORS.textHighlight, 11);
+
+  // message box
+  drawBox(10, 40, BASE_W - 20, 160);
+
+  if (state.messageSent) {
+    ctx.textAlign = 'center';
+    drawText('Message sent!', BASE_W / 2, 110, COLORS.hpGreen, 12);
+    drawText('kapoost reads every message.', BASE_W / 2, 130, COLORS.dialogBorder, 9);
+    ctx.textAlign = 'left';
+  } else {
+    drawText('Your message:', 24, 62, COLORS.dialogBorder, 9);
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(22, 70, BASE_W - 48, 100);
+    ctx.strokeStyle = COLORS.dialogBorderInner;
+    ctx.strokeRect(22, 70, BASE_W - 48, 100);
+
+    const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+    drawTextWrapped(state.messageText + cursor, 28, 84, BASE_W - 60, COLORS.text, 12);
+
+    drawText(`${state.messageText.length}/500`, BASE_W - 80, 180, COLORS.textDisabled, 7);
+  }
+
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  const hint = state.messageSent ? 'ESC Back' : 'Type message   ENTER Send   ESC Back';
+  drawText(hint, 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
 // ── MCP Connection ──
 
-async function connectToServer(url) {
-  state.serverUrl = url;
+async function mcpCall(tool, args = {}) {
   try {
-    const resp = await fetch(url.replace('/mcp', '/'), { mode: 'no-cors' });
-    // no-cors returns opaque response (status 0) but proves server is reachable
-    state.connected = true;
-    state.scene = 'menu';
-    showDialog('mira-chen', `Connected to ${url.replace('https://', '').split('.')[0]}. Welcome to the humanMCP RPG client. Choose an action from the menu.`);
+    const resp = await fetch(`${PROXY_URL}/call`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool, args }),
+    });
+    const data = await resp.json();
+    if (data.ok) return data.result;
+    throw new Error(data.error || 'MCP call failed');
   } catch (e) {
-    // network error — try offline mode anyway
-    state.connected = true;
-    state.serverUrl = url;
-    state.scene = 'menu';
-    showDialog('ghost', `Server unreachable (CORS or network). Running in offline mode — portraits and navigation work, but live MCP calls need a proxy.`);
+    console.warn(`MCP call ${tool} failed:`, e.message);
+    return null;
   }
 }
 
-function fetchContent() {
-  // Content catalog from humanMCP server (kapoost)
+async function connectToServer(url) {
+  state.serverUrl = url;
+
+  // try proxy first
+  try {
+    const resp = await fetch(`${PROXY_URL}/health`);
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      state.connected = true;
+      state.proxyAvailable = true;
+      state.scene = 'menu';
+      showDialog('mira-chen', `Connected via proxy to ${url.replace('https://', '').split('.')[0]}. All MCP tools available.`);
+      return;
+    }
+  } catch (_) {}
+
+  // fallback — offline mode
+  state.connected = true;
+  state.proxyAvailable = false;
+  state.serverUrl = url;
+  state.scene = 'menu';
+  showDialog('ghost', `Proxy not running. Start it: node proxy.js. Running in offline mode.`);
+}
+
+async function fetchContent() {
+  // try live first
+  if (state.proxyAvailable) {
+    const result = await mcpCall('list_content');
+    if (result) {
+      const lines = result.split('\n');
+      const items = [];
+      let current = {};
+      for (const line of lines) {
+        const m = line.match(/^(\w+):\s+(.+)$/);
+        if (m) {
+          const [, key, val] = m;
+          if (key === 'slug') { current = {}; current.slug = val.trim(); }
+          else if (key === 'title') current.title = val.trim();
+          else if (key === 'type') current.type = val.trim();
+          else if (key === 'access') {
+            current.access = val.trim();
+            current.date = '';
+            items.push(current);
+          }
+          else if (key === 'date') {
+            if (items.length > 0) items[items.length - 1].date = val.trim();
+          }
+        }
+      }
+      if (items.length > 0) {
+        state.contentItems = items;
+        return;
+      }
+    }
+  }
+
+  // fallback — static catalog
   state.contentItems = [
     { title: 'Suma człowieczeństwa', type: 'poem', slug: 'suma-cz-owiecze-stwa-1775231802', date: '3 Apr 2026', access: 'public' },
     { title: 'O ludziach', type: 'poem', slug: 'prompty-o-ludziach', date: '1 Apr 2026', access: 'public' },
@@ -1304,11 +1445,10 @@ function advanceDialog() {
 function handleKey(e) {
   ensureAudio();
 
-  // input mode
-  if (state.scene === 'connect') {
-    handleConnectInput(e);
-    return;
-  }
+  // text input scenes
+  if (state.scene === 'connect') { handleConnectInput(e); return; }
+  if (state.scene === 'vault') { handleVaultInput(e); return; }
+  if (state.scene === 'message') { handleMessageInput(e); return; }
 
   switch (e.key) {
     case 'Enter':
@@ -1354,6 +1494,70 @@ function handleConnectInput(e) {
   }
   if (e.key.length === 1) {
     state.inputText += e.key;
+  }
+}
+
+function handleVaultInput(e) {
+  if (e.key === 'Escape') {
+    playSfx('back');
+    state.scene = 'menu';
+    return;
+  }
+  if (e.key === 'Enter' && state.vaultQuery.trim()) {
+    playSfx('select');
+    searchVault(state.vaultQuery.trim());
+    return;
+  }
+  if (e.key === 'Backspace') {
+    state.vaultQuery = state.vaultQuery.slice(0, -1);
+    return;
+  }
+  if (e.key.length === 1) {
+    state.vaultQuery += e.key;
+  }
+}
+
+async function searchVault(query) {
+  state.vaultLoading = true;
+  state.vaultResults = null;
+  const result = await mcpCall('query_vault', { query });
+  state.vaultLoading = false;
+  if (result) {
+    state.vaultResults = result;
+  } else {
+    state.vaultResults = 'Vault unavailable. Start proxy: node proxy.js';
+  }
+}
+
+function handleMessageInput(e) {
+  if (e.key === 'Escape') {
+    playSfx('back');
+    state.scene = 'menu';
+    return;
+  }
+  if (e.key === 'Enter' && state.messageText.trim() && !state.messageSent) {
+    playSfx('select');
+    sendMessage(state.messageText.trim());
+    return;
+  }
+  if (state.messageSent) return;
+  if (e.key === 'Backspace') {
+    state.messageText = state.messageText.slice(0, -1);
+    return;
+  }
+  if (e.key.length === 1 && state.messageText.length < 500) {
+    state.messageText += e.key;
+  }
+}
+
+async function sendMessage(text) {
+  const result = await mcpCall('leave_message', { text });
+  if (result) {
+    state.messageSent = true;
+    playSfx('select');
+  } else {
+    showDialog('ghost', 'Message failed. Start proxy: node proxy.js');
+    state.scene = 'menu';
   }
 }
 
@@ -1413,10 +1617,15 @@ function handleMenuSelect() {
       fetchContent();
       break;
     case 3: // Vault
-      showDialog('zara', 'The vault holds memories and knowledge. Query it through the MCP tools.');
+      state.scene = 'vault';
+      state.vaultQuery = '';
+      state.vaultResults = null;
+      state.vaultLoading = false;
       break;
     case 4: // Message
-      showDialog('hermes', 'To send a message to kapoost, use the leave_message MCP tool from your agent.');
+      state.scene = 'message';
+      state.messageText = '';
+      state.messageSent = false;
       break;
     case 5: // About
       state.scene = 'about';
@@ -1502,6 +1711,8 @@ function handleBack() {
     case 'content':
     case 'skills':
     case 'about':
+    case 'vault':
+    case 'message':
       state.scene = 'menu';
       break;
     case 'reading':
