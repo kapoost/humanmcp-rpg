@@ -41,7 +41,7 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    #touch-controls.visible { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
+    #touch-controls.visible { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 16px 8px; position: relative; }
     .touch-btn {
       pointer-events: auto;
       width: 52px; height: 52px;
@@ -55,17 +55,34 @@
       touch-action: manipulation;
     }
     .touch-btn:active { background: rgba(100, 120, 180, 0.6); }
-    .dpad { position: relative; width: 140px; height: 140px; }
+    .dpad { position: relative; width: 140px; height: 130px; }
     .dpad .touch-btn { position: absolute; }
     .dpad .up    { top: 0; left: 44px; }
     .dpad .down  { bottom: 0; left: 44px; }
     .dpad .left  { top: 44px; left: 0; }
     .dpad .right { top: 44px; right: 0; }
-    .action-btns { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .action-btns { display: flex; flex-direction: column; gap: 10px; align-items: center; }
     .action-btns .touch-btn { font-size: 14px; font-weight: bold; font-family: 'Courier New', monospace; }
     .action-btns .btn-a { background: rgba(80, 160, 80, 0.4); border-color: rgba(100, 200, 100, 0.5); }
     .action-btns .btn-b { background: rgba(180, 80, 80, 0.4); border-color: rgba(220, 100, 100, 0.5); }
-    .action-btns .btn-tab { width: 72px; border-radius: 12px; font-size: 11px; background: rgba(100, 100, 140, 0.3); border-color: rgba(140, 140, 180, 0.4); }
+    .btn-tab {
+      pointer-events: auto;
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px; height: 24px;
+      border-radius: 12px;
+      background: rgba(100, 100, 140, 0.3);
+      border: 1px solid rgba(140, 140, 180, 0.4);
+      color: rgba(200, 210, 255, 0.7);
+      font-size: 10px; font-weight: bold;
+      font-family: 'Courier New', monospace;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .btn-tab:active { background: rgba(100, 100, 140, 0.5); }
 
     /* Hidden input for mobile keyboard */
     #mobile-input {
@@ -97,8 +114,8 @@
     <div class="action-btns">
       <div class="touch-btn btn-a" data-key="Enter">A</div>
       <div class="touch-btn btn-b" data-key="Escape">B</div>
-      <div class="touch-btn btn-tab" data-key="Tab">TAB</div>
     </div>
+    <div class="btn-tab" data-key="Tab">TAB</div>
   </div>
   <input id="mobile-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
   <script src="engine.js"></script>

@@ -389,6 +389,7 @@ const state = {
   connectField: 0,  // 0 = URL, 1 = token, 2 = session code
   inputCallback: null,
   starField: [],
+  seenTips: {},  // one-time George Carlin tips per scene
 };
 
 // ── Init ──
@@ -859,7 +860,7 @@ function renderTitle() {
 
   // subtitle
   ctx.fillStyle = COLORS.textDisabled;
-  ctx.fillText('connect to any humanMCP server', cx, cy);
+  ctx.fillText('explore any human\'s MCP server as a retro RPG', cx, cy);
 
   // prompt
   if (Math.floor(Date.now() / 800) % 2 === 0) {
@@ -1978,7 +1979,11 @@ function advanceDialog() {
     showDialog(next.persona, next.text);
   } else {
     state.currentDialog = null;
-    if (state.connected) {
+    // return to tip target scene if set
+    if (state._tipTarget) {
+      state.scene = state._tipTarget;
+      state._tipTarget = null;
+    } else if (state.connected) {
       state.scene = 'menu';
     } else {
       state.scene = 'title';
@@ -2163,35 +2168,62 @@ function handleSelect() {
   }
 }
 
+// George Carlin's one-time scene commentary
+const GEORGE_TIPS = {
+  team: "So this is the team. A bunch of AI personas pretending to have opinions. At least they don't need coffee breaks.",
+  skills: "Skills. Locked, of course. Everything good in life is behind a paywall or a password. Welcome to the future.",
+  content: "The library. A human wrote actual poems and put them on a server. In 2026. That's either brave or insane. I respect both.",
+  vault: "The vault. You type a question, a machine searches a human's memory. We used to call that 'asking someone.' Progress!",
+  message: "You're about to send a message to a real human. Remember when that was the default? Now it feels revolutionary.",
+  about: "The about page. Where you learn that behind all this code there's a sailor who writes poetry. The internet is a strange place.",
+};
+
+function showGeorgeTip(scene) {
+  if (state.seenTips[scene]) return;
+  state.seenTips[scene] = true;
+  const tip = GEORGE_TIPS[scene];
+  if (tip) {
+    // save target scene, show dialog, then return to target on dismiss
+    state._tipTarget = scene;
+    showDialog('george-carlin', tip);
+  }
+}
+
 function handleMenuSelect() {
   switch (state.menuCursor) {
     case 0: // Team
       state.scene = 'team';
       state.teamCursor = 0;
+      showGeorgeTip('team');
       break;
     case 1: // Skills
       state.scene = 'skills';
       state.skillsCursor = 0;
+      showGeorgeTip('skills');
       break;
     case 2: // Library
       state.scene = 'content';
       fetchContent();
+      showGeorgeTip('content');
       break;
     case 3: // Vault
       state.scene = 'vault';
       state.vaultQuery = '';
       state.vaultResults = null;
       state.vaultLoading = false;
+      showGeorgeTip('vault');
       break;
     case 4: // Message
       state.scene = 'message';
       state.messageText = '';
       state.messageSent = false;
+      showGeorgeTip('message');
       break;
     case 5: // About
       state.scene = 'about';
       state.aboutTab = 0;
       state.aboutScroll = 0;
+      showGeorgeTip('about');
       break;
     case 6: // Disconnect
       state.connected = false;
