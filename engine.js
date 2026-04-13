@@ -400,6 +400,7 @@ function init() {
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('keydown', handleKey);
+  window.addEventListener('paste', handlePaste);
 
   // generate starfield
   for (let i = 0; i < 60; i++) {
@@ -914,9 +915,9 @@ function renderConnect() {
   const sessCursor = sessionActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
   drawText(state.sessionInput + sessCursor, 62, 172, COLORS.text, 9);
 
-  drawText('TAB — switch field    ENTER — connect    ESC — back', 60, 200, COLORS.textDisabled, 8);
-  drawText('Leave token empty for offline mode', 60, 216, COLORS.textDisabled, 8);
-  drawText('Default: https://kapoost-humanmcp.fly.dev', 60, 232, COLORS.textDisabled, 8);
+  drawText('TAB — switch    ENTER — connect    ESC — back', 60, 196, COLORS.textDisabled, 8);
+  drawText('Ctrl/Cmd+V to paste    Leave token empty for offline', 60, 210, COLORS.textDisabled, 8);
+  drawText('Session code unlocks full personas & skills', 60, 224, COLORS.textDisabled, 8);
 }
 
 // ── Main Menu ──
@@ -2028,6 +2029,31 @@ function handleKey(e) {
   }
 }
 
+function handlePaste(e) {
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if (!text) return;
+
+  const textScenes = ['connect', 'vault', 'message'];
+  if (!textScenes.includes(state.scene)) return;
+
+  e.preventDefault();
+  const clean = text.replace(/[\n\r]/g, ' ').trim();
+
+  if (state.scene === 'connect') {
+    const fields = [
+      { get: () => state.inputText, set: v => state.inputText = v, max: 200 },
+      { get: () => state.tokenInput, set: v => state.tokenInput = v, max: 64 },
+      { get: () => state.sessionInput, set: v => state.sessionInput = v, max: 200 },
+    ];
+    const f = fields[state.connectField];
+    f.set((f.get() + clean).slice(0, f.max));
+  } else if (state.scene === 'vault') {
+    state.vaultQuery = (state.vaultQuery + clean).slice(0, 200);
+  } else if (state.scene === 'message' && !state.messageSent) {
+    state.messageText = (state.messageText + clean).slice(0, 500);
+  }
+}
+
 function handleConnectInput(e) {
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -2056,6 +2082,7 @@ function handleConnectInput(e) {
   ];
   const f = fields[state.connectField];
   if (e.key === 'Backspace') { f.set(f.get().slice(0, -1)); return; }
+  if (e.ctrlKey || e.metaKey) return; // let paste event handle Ctrl+V / Cmd+V
   if (e.key.length === 1 && f.get().length < f.max) { f.set(f.get() + e.key); }
 }
 
@@ -2074,6 +2101,7 @@ function handleVaultInput(e) {
     state.vaultQuery = state.vaultQuery.slice(0, -1);
     return;
   }
+  if (e.ctrlKey || e.metaKey) return;
   if (e.key.length === 1) {
     state.vaultQuery += e.key;
   }
@@ -2107,6 +2135,7 @@ function handleMessageInput(e) {
     state.messageText = state.messageText.slice(0, -1);
     return;
   }
+  if (e.ctrlKey || e.metaKey) return;
   if (e.key.length === 1 && state.messageText.length < 500) {
     state.messageText += e.key;
   }
@@ -2128,10 +2157,10 @@ function handleSelect() {
     case 'title':
       stopTitleMusic();
       state.scene = 'connect';
-      state.inputText = '';
+      state.inputText = 'https://kapoost-humanmcp.fly.dev/mcp';
       state.tokenInput = '';
       state.sessionInput = '';
-      state.connectField = 0;
+      state.connectField = 1; // jump to token field (URL pre-filled)
       break;
 
     case 'dialog':
