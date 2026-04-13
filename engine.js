@@ -90,6 +90,140 @@ const PERSONAS = [
     desc: 'Chaos testing, edge cases, impossible scenarios. Entropy is her ally.' },
 ];
 
+// ── Skills Data ──
+
+const SKILLS = [
+  { id: 'a2a-resources-roadmap', name: 'Roadmap', cat: 'roadmap', icon: '🗺', locked: true },
+  { id: 'agent-system-prompt', name: 'Session Protocol', cat: 'workflow', icon: '⚙', locked: true },
+  { id: 'deploy-workflow', name: 'Deploy Workflow', cat: 'tech', icon: '🚀', locked: true },
+  { id: 'documentation-ownership', name: 'Doc Ownership', cat: 'workflow', icon: '📋', locked: true },
+  { id: 'go-stack', name: 'Go Stack', cat: 'tech', icon: '🔧', locked: true },
+  { id: 'humanmcp-architecture', name: 'humanMCP Arch', cat: 'tech', icon: '🏛', locked: true },
+  { id: 'humanmcp-project', name: 'humanMCP Project', cat: 'tech', icon: '📦', locked: true },
+  { id: 'mcp-clients', name: 'MCP Clients', cat: 'tech', icon: '🔌', locked: true },
+  { id: 'mx5-basics', name: 'Mazda MX-5', cat: 'cars', icon: '🏎', locked: true },
+  { id: 'mysloodsiewnia-architecture', name: 'Mysloodsiewnia Arch', cat: 'tech', icon: '🧠', locked: true },
+  { id: 'mysloodsiewnia-howto', name: 'Mysloodsiewnia Howto', cat: 'tech', icon: '📖', locked: true },
+  { id: 'onaudience-context', name: 'onAudience', cat: 'business', icon: '📊', locked: true },
+  { id: 's2000-basics', name: 'Honda S2000', cat: 'cars', icon: '🏎', locked: true },
+  { id: 'security-scope', name: 'Security Scope', cat: 'security', icon: '🛡', locked: true },
+  { id: 'team-dynamics', name: 'Team Dynamics', cat: 'workflow', icon: '👥', locked: true },
+  { id: 'testing-philosophy', name: 'Testing Philosophy', cat: 'tech', icon: '🧪', locked: true },
+  { id: 'working-style', name: 'Working Style', cat: 'workflow', icon: '✍', locked: true },
+  { id: 'writing-style', name: 'Writing Style', cat: 'writing', icon: '🖊', locked: true },
+];
+
+const SKILL_CATEGORIES = {
+  tech: { color: '#44ccff', label: 'Tech' },
+  workflow: { color: '#ffcc44', label: 'Workflow' },
+  cars: { color: '#ff6644', label: 'Cars' },
+  business: { color: '#44dd88', label: 'Business' },
+  security: { color: '#ff4466', label: 'Security' },
+  writing: { color: '#cc88ff', label: 'Writing' },
+  roadmap: { color: '#88ff88', label: 'Roadmap' },
+};
+
+// ── Author Profile ──
+
+const AUTHOR = {
+  name: 'kapoost',
+  bio: 'I am a poet and a builder. I grew up in Zamosc, studied in Wroclaw, and ended up in Warsaw — though I spend as much time as I can at sea.',
+  roles: ['Sailor', 'Poet', 'Musician (learning)', 'CTO'],
+  server: 'https://kapoost-humanmcp.fly.dev',
+  stats: {
+    pieces: 8,
+    locked: 1,
+    skills: 18,
+    personas: 14,
+  },
+  motto: 'I write because something in me has to. I sail because something in me must.',
+};
+
+// ── Audio System ──
+
+const SFX = {};
+
+function initAudio() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  SFX.cursor = () => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 800;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+  };
+
+  SFX.select = () => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 1200;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+  };
+
+  SFX.back = () => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 400;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.08);
+  };
+
+  SFX.typewriter = () => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 600 + Math.random() * 200;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.02);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.02);
+  };
+
+  SFX.locked = () => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 200;
+    osc.type = 'sawtooth';
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.2);
+  };
+}
+
+let audioInitialized = false;
+function ensureAudio() {
+  if (!audioInitialized) {
+    initAudio();
+    audioInitialized = true;
+  }
+}
+
+function playSfx(name) {
+  if (SFX[name]) SFX[name]();
+}
+
 // ── Content Bodies ──
 
 const CONTENT_BODY = {
@@ -113,7 +247,7 @@ const CONTENT_IMAGES = {
 // ── State ──
 
 const state = {
-  scene: 'title',       // title | menu | dialog | team | content | reading
+  scene: 'title',       // title | menu | dialog | team | content | reading | skills | about
   faces: {},             // loaded face images
   contentImages: {},     // loaded content images
   facesLoaded: 0,
@@ -128,6 +262,7 @@ const state = {
   contentCursor: 0,
   readingSlug: null,
   readingScroll: 0,
+  skillsCursor: 0,
   serverUrl: '',
   connected: false,
   inputActive: false,
@@ -209,6 +344,7 @@ function update(dt) {
     while (state.currentDialog.timer >= TYPEWRITER_SPEED && !state.currentDialog.done) {
       state.currentDialog.timer -= TYPEWRITER_SPEED;
       state.currentDialog.charIndex++;
+      if (state.currentDialog.charIndex % 2 === 0) playSfx('typewriter');
       if (state.currentDialog.charIndex >= state.currentDialog.text.length) {
         state.currentDialog.done = true;
       }
@@ -237,6 +373,8 @@ function render() {
     case 'team': renderTeam(); break;
     case 'content': renderContent(); break;
     case 'reading': renderReading(); break;
+    case 'skills': renderSkills(); break;
+    case 'about': renderAbout(); break;
   }
 }
 
@@ -786,6 +924,139 @@ function renderReading() {
   drawText(hint, 20, BASE_H - 14, COLORS.textDisabled, 8);
 }
 
+// ── Skills Scene ──
+
+function renderSkills() {
+  // header
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Skills', 20, 24, COLORS.textHighlight, 11);
+  drawText(`${SKILLS.length} skills`, BASE_W - 90, 24, COLORS.textDisabled, 8);
+
+  // list
+  const listX = 10;
+  const listY = 40;
+  const listW = 180;
+  const visibleCount = Math.min(SKILLS.length, 12);
+
+  drawBox(listX, listY, listW, visibleCount * 18 + 12);
+
+  const scrollOffset = Math.max(0, state.skillsCursor - visibleCount + 1);
+  for (let i = 0; i < visibleCount && i + scrollOffset < SKILLS.length; i++) {
+    const s = SKILLS[i + scrollOffset];
+    const iy = listY + 14 + i * 18;
+    const selected = state.skillsCursor === i + scrollOffset;
+    const cat = SKILL_CATEGORIES[s.cat] || { color: COLORS.text };
+
+    if (selected) drawCursor(listX + 6, iy);
+    drawText(s.name, listX + 22, iy, selected ? COLORS.textHighlight : COLORS.text, 8);
+  }
+
+  // detail panel
+  const detailX = 198;
+  const detailW = BASE_W - detailX - 10;
+  drawBox(detailX, listY, detailW, BASE_H - listY - 36);
+
+  const sel = SKILLS[state.skillsCursor];
+  if (sel) {
+    const cat = SKILL_CATEGORIES[sel.cat] || { color: COLORS.text, label: sel.cat };
+
+    // category badge
+    const badgeW = ctx.measureText ? 60 : 60;
+    drawBox(detailX + 10, listY + 10, badgeW + 16, 20);
+    drawText(cat.label.toUpperCase(), detailX + 18, listY + 24, cat.color, 9);
+
+    // skill name
+    drawText(sel.name, detailX + 10, listY + 48, COLORS.textHighlight, 12);
+    drawText(`ID: ${sel.id}`, detailX + 10, listY + 64, COLORS.textDisabled, 7);
+
+    // lock status
+    const lockY = listY + 88;
+    if (sel.locked) {
+      drawBox(detailX + 10, lockY, detailW - 24, 50);
+      drawText('LOCKED', detailX + 20, lockY + 18, COLORS.textHighlight, 10);
+      drawTextWrapped('Full content available after bootstrap_session. Ask for session code.', detailX + 20, lockY + 34, detailW - 44, COLORS.textDisabled, 11);
+    }
+
+    // category stats at bottom
+    const statsY = BASE_H - 80;
+    drawText('Category breakdown:', detailX + 10, statsY, COLORS.dialogBorder, 8);
+    let sx = detailX + 10;
+    const catCounts = {};
+    SKILLS.forEach(s => { catCounts[s.cat] = (catCounts[s.cat] || 0) + 1; });
+    let row = 0;
+    Object.entries(catCounts).forEach(([k, v], i) => {
+      const c = SKILL_CATEGORIES[k] || { color: COLORS.text, label: k };
+      const col = i % 3;
+      row = Math.floor(i / 3);
+      drawText(`${c.label}: ${v}`, detailX + 10 + col * 85, statsY + 14 + row * 12, c.color, 7);
+    });
+  }
+
+  // controls
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('↑↓ Navigate   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
+// ── About Scene ──
+
+function renderAbout() {
+  // header
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('About', 20, 24, COLORS.textHighlight, 11);
+
+  // portrait + name card
+  const cardX = 10;
+  const cardY = 40;
+  const cardW = BASE_W - 20;
+  drawBox(cardX, cardY, cardW, 100);
+
+  // face - use mira-chen as kapoost representative or first available
+  drawFace('mira-chen', cardX + 14, cardY + 10, 56);
+
+  // name and roles
+  drawText(AUTHOR.name, cardX + 82, cardY + 22, COLORS.textHighlight, 14);
+  AUTHOR.roles.forEach((role, i) => {
+    drawText(role, cardX + 82 + i * 0, cardY + 38 + i * 13, COLORS.dialogBorder, 9);
+  });
+
+  // bio
+  const bioY = cardY + 108;
+  drawBox(cardX, bioY, cardW, 70);
+  drawTextWrapped(AUTHOR.bio, cardX + 12, bioY + 16, cardW - 28, COLORS.text, 12);
+
+  // stats grid
+  const gridY = bioY + 78;
+  drawBox(cardX, gridY, cardW, 50);
+  const statItems = [
+    { label: 'Pieces', val: AUTHOR.stats.pieces, color: COLORS.hpGreen },
+    { label: 'Locked', val: AUTHOR.stats.locked, color: COLORS.textHighlight },
+    { label: 'Skills', val: AUTHOR.stats.skills, color: COLORS.mpBlue },
+    { label: 'Personas', val: AUTHOR.stats.personas, color: '#cc88ff' },
+  ];
+  const colW = Math.floor(cardW / 4);
+  statItems.forEach((s, i) => {
+    const sx = cardX + i * colW + colW / 2;
+    ctx.textAlign = 'center';
+    drawText(String(s.val), sx, gridY + 20, s.color, 16);
+    drawText(s.label, sx, gridY + 36, COLORS.textDisabled, 8);
+    ctx.textAlign = 'left';
+  });
+
+  // motto
+  const mottoY = gridY + 58;
+  drawBox(cardX, mottoY, cardW, 28);
+  ctx.textAlign = 'center';
+  drawText(`"${AUTHOR.motto}"`, BASE_W / 2, mottoY + 18, COLORS.dialogBorder, 8);
+  ctx.textAlign = 'left';
+
+  // server info
+  drawText(`MCP: ${AUTHOR.server}`, cardX + 8, BASE_H - 38, COLORS.textDisabled, 7);
+
+  // controls
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
 // ── MCP Connection ──
 
 async function connectToServer(url) {
@@ -859,6 +1130,8 @@ function advanceDialog() {
 // ── Input ──
 
 function handleKey(e) {
+  ensureAudio();
+
   // input mode
   if (state.scene === 'connect') {
     handleConnectInput(e);
@@ -868,15 +1141,19 @@ function handleKey(e) {
   switch (e.key) {
     case 'Enter':
     case ' ':
+      playSfx('select');
       handleSelect();
       break;
     case 'ArrowUp':
+      playSfx('cursor');
       handleUp();
       break;
     case 'ArrowDown':
+      playSfx('cursor');
       handleDown();
       break;
     case 'Escape':
+      playSfx('back');
       handleBack();
       break;
   }
@@ -928,11 +1205,17 @@ function handleSelect() {
         state.readingScroll = 0;
         state.scene = 'reading';
       } else if (ci && ci.access === 'locked') {
+        playSfx('locked');
         showDialog('ghost', 'This content is locked. Use request_access via MCP to unlock it.');
       }
       break;
 
     case 'reading':
+      break;
+
+    case 'skills':
+      playSfx('locked');
+      showDialog('ghost', 'Skill content is locked. Use bootstrap_session with session code to unlock.');
       break;
   }
 }
@@ -944,7 +1227,8 @@ function handleMenuSelect() {
       state.teamCursor = 0;
       break;
     case 1: // Skills
-      showDialog('kenji-mori', 'Skills catalog — connect with bootstrap_session to unlock full skill descriptions.');
+      state.scene = 'skills';
+      state.skillsCursor = 0;
       break;
     case 2: // Library
       state.scene = 'content';
@@ -957,7 +1241,7 @@ function handleMenuSelect() {
       showDialog('hermes', 'To send a message to kapoost, use the leave_message MCP tool from your agent.');
       break;
     case 5: // About
-      showDialog('mira-chen', 'kapoost — sailor, poet, musician, CTO. A humanMCP server is a personal API for humans.');
+      state.scene = 'about';
       break;
     case 6: // Disconnect
       state.connected = false;
@@ -981,6 +1265,9 @@ function handleUp() {
     case 'reading':
       state.readingScroll = Math.max(0, state.readingScroll - 20);
       break;
+    case 'skills':
+      state.skillsCursor = Math.max(0, state.skillsCursor - 1);
+      break;
   }
 }
 
@@ -998,6 +1285,9 @@ function handleDown() {
     case 'reading':
       state.readingScroll = Math.min(state._maxScroll || 0, state.readingScroll + 20);
       break;
+    case 'skills':
+      state.skillsCursor = Math.min(SKILLS.length - 1, state.skillsCursor + 1);
+      break;
   }
 }
 
@@ -1008,6 +1298,8 @@ function handleBack() {
       break;
     case 'team':
     case 'content':
+    case 'skills':
+    case 'about':
       state.scene = 'menu';
       break;
     case 'reading':
