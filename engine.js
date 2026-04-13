@@ -379,12 +379,14 @@ const state = {
   messageSent: false,
   proxyAvailable: false,
   proxyToken: '',
+  sessionCode: '',
   serverUrl: '',
   connected: false,
   inputActive: false,
   inputText: '',
   tokenInput: '',
-  connectField: 0,  // 0 = URL, 1 = token
+  sessionInput: '',
+  connectField: 0,  // 0 = URL, 1 = token, 2 = session code
   inputCallback: null,
   starField: [],
 };
@@ -498,6 +500,8 @@ function loadFaces() {
       state.facesLoaded++;
     };
     img.onerror = () => {
+      // generate procedural pixel avatar as fallback
+      state.faces[p.id] = generateAvatar(p.name, 48);
       state.facesLoaded++;
     };
     const spriteId = FACE_REMAP[p.id] || p.id;
@@ -656,10 +660,12 @@ function drawCursor(x, y) {
 }
 
 function drawFace(personaId, x, y, size = 48, full = false) {
-  const img = state.faces[personaId];
-  if (img) {
-    if (full) {
-      // show entire sprite, fit to box preserving aspect ratio
+  const face = state.faces[personaId];
+  if (face) {
+    const isCanvas = face instanceof HTMLCanvasElement;
+    const img = face;
+    if (isCanvas || full) {
+      // generated avatars or full view — fit to box
       const scale = Math.min(size / img.width, size / img.height);
       const dw = Math.floor(img.width * scale);
       const dh = Math.floor(img.height * scale);
@@ -667,22 +673,164 @@ function drawFace(personaId, x, y, size = 48, full = false) {
       const dy = y + Math.floor((size - dh) / 2);
       ctx.drawImage(img, dx, dy, dw, dh);
     } else {
-      // crop: show top 60% of sprite (head + shoulders, cut legs)
+      // real sprite: crop top 60% (head + shoulders, cut legs)
       const cropH = Math.floor(img.height * 0.6);
       ctx.drawImage(img, 0, 0, img.width, cropH, x, y, size, size);
     }
-    // border
     ctx.strokeStyle = COLORS.dialogBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, size, size);
   } else {
-    // placeholder
-    ctx.fillStyle = '#222';
-    ctx.fillRect(x, y, size, size);
+    // no face loaded yet — generate on the fly
+    const persona = PERSONAS.find(p => p.id === personaId);
+    const avatar = generateAvatar(persona?.name || personaId, size);
+    const scale = Math.min(size / avatar.width, size / avatar.height);
+    const dw = Math.floor(avatar.width * scale);
+    const dh = Math.floor(avatar.height * scale);
+    ctx.drawImage(avatar, x + Math.floor((size - dw) / 2), y + Math.floor((size - dh) / 2), dw, dh);
     ctx.strokeStyle = COLORS.dialogBorderInner;
+    ctx.lineWidth = 1;
     ctx.strokeRect(x, y, size, size);
-    drawText('?', x + size/2 - 3, y + size/2 + 4, COLORS.textDisabled);
   }
+}
+
+// ── Procedural Pixel Avatar Generator ──
+
+const avatarCache = {};
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// palette: skin, hair, outfit primary, outfit secondary, accent
+const SKIN_TONES = ['#f5d0a9', '#e8b88a', '#c68e5b', '#8d5524', '#ffdbac', '#d4a373'];
+const HAIR_COLORS = ['#2c1b0e', '#4a3222', '#8b4513', '#c4931e', '#e8e0d0', '#cc3333', '#4444cc', '#22aa44', '#aa44cc', '#666666'];
+const OUTFIT_COLORS = ['#cc2244', '#2244cc', '#22aa44', '#cc8800', '#8822aa', '#228888', '#aa2288', '#445566', '#886633', '#336644'];
+
+function generateAvatar(name, size) {
+  if (avatarCache[name]) return avatarCache[name];
+
+  const h = hashStr(name);
+  const h2 = hashStr(name + 'x');
+  const h3 = hashStr(name + 'z');
+
+  const skin = SKIN_TONES[h % SKIN_TONES.length];
+  const hair = HAIR_COLORS[h2 % HAIR_COLORS.length];
+  const outfit = OUTFIT_COLORS[h3 % OUTFIT_COLORS.length];
+  const outfitAlt = OUTFIT_COLORS[(h3 + 3) % OUTFIT_COLORS.length];
+  const eyeColor = ['#222', '#2244aa', '#22aa44', '#884400'][h % 4];
+
+  // 10x14 pixel grid — half-width (mirrored), so we define 5 columns
+  // rows: 0-3 hair, 3-5 face, 5-6 neck, 6-10 body, 10-13 legs
+  const W = 10, H = 14;
+  const grid = Array.from({ length: H }, () => Array(W).fill(null));
+
+  const hairStyle = h % 5;
+  const hasHat = h2 % 6 === 0;
+  const hasCape = h3 % 5 === 0;
+
+  // helper: set pixel + mirror
+  function sym(r, c, color) {
+    if (r >= 0 && r < H && c >= 0 && c < W) {
+      grid[r][c] = color;
+      grid[r][W - 1 - c] = color;
+    }
+  }
+  function row(r, c0, c1, color) {
+    for (let c = c0; c <= c1; c++) sym(r, c, color);
+  }
+
+  // hair top
+  if (hasHat) {
+    row(0, 2, 4, outfit);
+    row(1, 1, 4, outfit);
+    row(2, 2, 4, hair);
+  } else {
+    switch (hairStyle) {
+      case 0: // short
+        row(0, 2, 4, hair); row(1, 2, 4, hair); row(2, 2, 4, hair);
+        break;
+      case 1: // spiky
+        sym(0, 2, hair); sym(0, 4, hair); row(1, 2, 4, hair); row(2, 2, 4, hair);
+        break;
+      case 2: // long sides
+        row(0, 2, 4, hair); row(1, 1, 4, hair); row(2, 1, 4, hair);
+        break;
+      case 3: // poofy
+        row(0, 2, 4, hair); row(1, 2, 4, hair); row(2, 1, 4, hair);
+        sym(3, 1, hair);
+        break;
+      case 4: // mohawk
+        sym(0, 3, hair); row(1, 3, 4, hair); row(2, 2, 4, hair);
+        break;
+    }
+  }
+
+  // face
+  row(3, 2, 4, skin); row(4, 2, 4, skin); row(5, 3, 3, skin);
+  // eyes
+  sym(3, 3, eyeColor);
+  // mouth
+  grid[4][3] = '#cc6655'; grid[4][W - 1 - 3] = '#cc6655';
+
+  // neck
+  sym(5, 3, skin);
+
+  // body
+  row(6, 2, 4, outfit); row(7, 1, 4, outfit);
+  row(8, 1, 4, outfit); row(9, 1, 4, outfit);
+  // belt / detail
+  row(8, 2, 4, outfitAlt);
+  // arms
+  sym(7, 1, skin); sym(8, 1, skin);
+  // hands
+  sym(9, 1, skin);
+
+  // legs
+  row(10, 2, 3, outfit); row(10, 3, 4, outfit);
+  sym(11, 2, outfit); sym(11, 4, outfit);
+  sym(12, 2, '#443322'); sym(12, 4, '#443322'); // boots
+  sym(13, 2, '#332211'); sym(13, 4, '#332211');
+
+  // cape
+  if (hasCape) {
+    for (let r = 6; r <= 10; r++) sym(r, 0, outfitAlt);
+  }
+
+  // outline
+  const BG = null;
+  const outlined = grid.map(r => [...r]);
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      if (grid[r][c]) continue;
+      const neighbors = [
+        r > 0 && grid[r-1][c], r < H-1 && grid[r+1][c],
+        c > 0 && grid[r][c-1], c < W-1 && grid[r][c+1],
+      ];
+      if (neighbors.some(Boolean)) outlined[r][c] = '#111';
+    }
+  }
+
+  // render to offscreen canvas
+  const px = Math.max(1, Math.floor(size / W));
+  const cvs = document.createElement('canvas');
+  cvs.width = W * px;
+  cvs.height = H * px;
+  const c = cvs.getContext('2d');
+
+  for (let r = 0; r < H; r++) {
+    for (let col = 0; col < W; col++) {
+      if (outlined[r][col]) {
+        c.fillStyle = outlined[r][col];
+        c.fillRect(col * px, r * px, px, px);
+      }
+    }
+  }
+
+  avatarCache[name] = cvs;
+  return cvs;
 }
 
 // ── Title Screen ──
@@ -731,30 +879,39 @@ function renderTitle() {
 // ── Connect Screen ──
 
 function renderConnect() {
-  drawBox(40, 60, BASE_W - 80, 200);
+  drawBox(40, 40, BASE_W - 80, 240);
 
-  drawText('Connect to humanMCP Server', 60, 85, COLORS.textHighlight);
+  drawText('Connect to humanMCP Server', 60, 62, COLORS.textHighlight);
 
   // URL field
   const urlActive = state.connectField === 0;
-  drawText('Server URL:', 60, 108, urlActive ? COLORS.text : COLORS.textDisabled);
+  drawText('Server URL:', 60, 82, urlActive ? COLORS.text : COLORS.textDisabled, 9);
   ctx.fillStyle = '#000';
-  ctx.fillRect(58, 114, BASE_W - 120, 18);
+  ctx.fillRect(58, 88, BASE_W - 120, 18);
   ctx.strokeStyle = urlActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
-  ctx.strokeRect(58, 114, BASE_W - 120, 18);
+  ctx.strokeRect(58, 88, BASE_W - 120, 18);
   const urlCursor = urlActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
-  drawText(state.inputText + urlCursor, 62, 126, COLORS.text, 9);
+  drawText(state.inputText + urlCursor, 62, 100, COLORS.text, 9);
 
   // Token field
   const tokenActive = state.connectField === 1;
-  drawText('Proxy token (from node proxy.js):', 60, 148, tokenActive ? COLORS.text : COLORS.textDisabled);
+  drawText('Proxy token (from node proxy.js):', 60, 118, tokenActive ? COLORS.text : COLORS.textDisabled, 9);
   ctx.fillStyle = '#000';
-  ctx.fillRect(58, 154, BASE_W - 120, 18);
+  ctx.fillRect(58, 124, BASE_W - 120, 18);
   ctx.strokeStyle = tokenActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
-  ctx.strokeRect(58, 154, BASE_W - 120, 18);
+  ctx.strokeRect(58, 124, BASE_W - 120, 18);
   const tokCursor = tokenActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
-  const tokDisplay = state.proxyToken ? state.proxyToken.slice(0, 8) + '...' + tokCursor : tokCursor;
-  drawText(state.tokenInput + tokCursor, 62, 166, COLORS.text, 9);
+  drawText(state.tokenInput + tokCursor, 62, 136, COLORS.text, 9);
+
+  // Session code field
+  const sessionActive = state.connectField === 2;
+  drawText('Session code (optional — unlocks full team):', 60, 154, sessionActive ? COLORS.text : COLORS.textDisabled, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(58, 160, BASE_W - 120, 18);
+  ctx.strokeStyle = sessionActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 160, BASE_W - 120, 18);
+  const sessCursor = sessionActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+  drawText(state.sessionInput + sessCursor, 62, 172, COLORS.text, 9);
 
   drawText('TAB — switch field    ENTER — connect    ESC — back', 60, 200, COLORS.textDisabled, 8);
   drawText('Leave token empty for offline mode', 60, 216, COLORS.textDisabled, 8);
@@ -1540,8 +1697,16 @@ async function connectToServer(url) {
       fetchSkills();
       fetchAuthorProfile();
 
+      // bootstrap session if code provided
+      if (state.sessionCode) {
+        bootstrapSession(state.sessionCode);
+      }
+
       const serverName = url.replace('https://', '').replace('http://', '').split('.')[0].split('/')[0];
-      showDialog('mira-chen', `Connected to ${serverName}. Loading team, skills, profile...`);
+      const msg = state.sessionCode
+        ? `Connected to ${serverName}. Bootstrapping session...`
+        : `Connected to ${serverName}. Loading team, skills, profile...`;
+      showDialog('mira-chen', msg);
       return;
     }
   } catch (_) {}
@@ -1671,6 +1836,22 @@ async function fetchAuthorProfile() {
   AUTHOR.stats.skills = SKILLS.length;
 }
 
+async function bootstrapSession(code) {
+  const result = await mcpCall('bootstrap_session', { code, format: 'full' });
+  if (!result) {
+    showDialog('ghost', 'Session bootstrap failed. Check your session code.');
+    return;
+  }
+  if (result.includes('Invalid') || result.includes('invalid') || result.includes('denied')) {
+    showDialog('ghost', 'Invalid session code. Access denied.');
+    return;
+  }
+  state.bootstrapped = true;
+  // unlock skills after bootstrap
+  SKILLS.forEach(s => { s.locked = false; });
+  showDialog('zara', 'Session unlocked. Full team and skills available.');
+}
+
 async function fetchContent() {
   // try live first
   if (state.proxyAvailable) {
@@ -1793,12 +1974,13 @@ function handleKey(e) {
 function handleConnectInput(e) {
   if (e.key === 'Tab') {
     e.preventDefault();
-    state.connectField = state.connectField === 0 ? 1 : 0;
+    state.connectField = (state.connectField + 1) % 3;
     return;
   }
   if (e.key === 'Enter') {
     const url = state.inputText.trim() || 'https://kapoost-humanmcp.fly.dev/mcp';
     state.proxyToken = state.tokenInput.trim();
+    state.sessionCode = state.sessionInput.trim();
     connectToServer(url);
     return;
   }
@@ -1806,16 +1988,18 @@ function handleConnectInput(e) {
     state.scene = 'title';
     state.inputText = '';
     state.tokenInput = '';
+    state.sessionInput = '';
     return;
   }
   // route to active field
-  if (state.connectField === 0) {
-    if (e.key === 'Backspace') { state.inputText = state.inputText.slice(0, -1); return; }
-    if (e.key.length === 1 && state.inputText.length < 200) { state.inputText += e.key; }
-  } else {
-    if (e.key === 'Backspace') { state.tokenInput = state.tokenInput.slice(0, -1); return; }
-    if (e.key.length === 1 && state.tokenInput.length < 64) { state.tokenInput += e.key; }
-  }
+  const fields = [
+    { get: () => state.inputText, set: v => state.inputText = v, max: 200 },
+    { get: () => state.tokenInput, set: v => state.tokenInput = v, max: 64 },
+    { get: () => state.sessionInput, set: v => state.sessionInput = v, max: 200 },
+  ];
+  const f = fields[state.connectField];
+  if (e.key === 'Backspace') { f.set(f.get().slice(0, -1)); return; }
+  if (e.key.length === 1 && f.get().length < f.max) { f.set(f.get() + e.key); }
 }
 
 function handleVaultInput(e) {
@@ -1889,6 +2073,7 @@ function handleSelect() {
       state.scene = 'connect';
       state.inputText = '';
       state.tokenInput = '';
+      state.sessionInput = '';
       state.connectField = 0;
       break;
 

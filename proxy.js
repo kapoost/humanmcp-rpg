@@ -34,6 +34,7 @@ const ALLOWED_TOOLS = new Set([
   'request_access',
   'submit_answer',
   'about_humanmcp',
+  'bootstrap_session',
 ]);
 
 const server = http.createServer(async (req, res) => {
