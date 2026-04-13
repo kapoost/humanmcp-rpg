@@ -32,7 +32,8 @@ const COLORS = {
 
 // ── Persona Data ──
 
-const PERSONAS = [
+// Default personas — overwritten by live MCP data on connect
+let PERSONAS = [
   { id: 'mira-chen', name: 'Mira Chen', role: 'Principal Engineer', color: '#88ccff',
     lv: 42, hp: 920, hpMax: 920, mp: 180, mpMax: 200,
     stats: { STR: 0.5, INT: 0.95, WIS: 0.85, DEX: 0.6, CHA: 0.7 },
@@ -100,7 +101,8 @@ const FACE_REMAP = {
 
 // ── Skills Data ──
 
-const SKILLS = [
+// Default skills — overwritten by live MCP data on connect
+let SKILLS = [
   { id: 'a2a-resources-roadmap', name: 'Roadmap', cat: 'roadmap', icon: '🗺', locked: true },
   { id: 'agent-system-prompt', name: 'Session Protocol', cat: 'workflow', icon: '⚙', locked: true },
   { id: 'deploy-workflow', name: 'Deploy Workflow', cat: 'tech', icon: '🚀', locked: true },
@@ -133,7 +135,8 @@ const SKILL_CATEGORIES = {
 
 // ── Author Profile ──
 
-const AUTHOR = {
+// Default author — overwritten by live MCP data on connect
+let AUTHOR = {
   name: 'kapoost',
   bio: 'I am a poet and a builder. I grew up in Zamosc, studied in Wroclaw, and ended up in Warsaw — though I spend as much time as I can at sea.',
   roles: ['Sailor', 'Poet', 'Musician (learning)', 'CTO'],
@@ -220,6 +223,102 @@ function initAudio() {
   };
 }
 
+// ── Title Music — original melancholic arpeggio (music-box style) ──
+
+let titleMusicCtx = null;
+let titleMusicNodes = [];
+let titleMusicTimer = null;
+
+function startTitleMusic() {
+  if (titleMusicTimer) return; // already playing
+  titleMusicCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Original melody — wistful, gentle, looping arpeggio in A minor
+  // Not Aerith's theme — an original composition in similar spirit
+  const bpm = 72;
+  const beat = 60 / bpm;
+  const melody = [
+    // phrase 1 — descending lullaby
+    { note: 'E5',  dur: 1.5 },
+    { note: 'C5',  dur: 0.5 },
+    { note: 'D5',  dur: 1   },
+    { note: 'B4',  dur: 1   },
+    { note: 'A4',  dur: 1.5 },
+    { note: 'G4',  dur: 0.5 },
+    { note: 'A4',  dur: 2   },
+    // phrase 2 — hopeful rise
+    { note: 'C5',  dur: 1   },
+    { note: 'D5',  dur: 0.5 },
+    { note: 'E5',  dur: 1.5 },
+    { note: 'D5',  dur: 0.5 },
+    { note: 'C5',  dur: 0.5 },
+    { note: 'B4',  dur: 1   },
+    { note: 'A4',  dur: 1   },
+    { note: null,   dur: 1.5 }, // rest
+    // phrase 3 — gentle resolve
+    { note: 'E5',  dur: 1   },
+    { note: 'F5',  dur: 0.5 },
+    { note: 'E5',  dur: 1   },
+    { note: 'D5',  dur: 0.5 },
+    { note: 'C5',  dur: 1   },
+    { note: 'B4',  dur: 0.5 },
+    { note: 'A4',  dur: 2.5 },
+    { note: null,   dur: 1   }, // rest before loop
+  ];
+
+  const noteFreqs = {
+    'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+    'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46,
+  };
+
+  let noteIndex = 0;
+
+  function playNote() {
+    if (!titleMusicCtx) return;
+    const { note, dur } = melody[noteIndex % melody.length];
+    const duration = dur * beat;
+
+    if (note && noteFreqs[note]) {
+      const osc = titleMusicCtx.createOscillator();
+      const gain = titleMusicCtx.createGain();
+      osc.connect(gain);
+      gain.connect(titleMusicCtx.destination);
+
+      osc.type = 'triangle';
+      osc.frequency.value = noteFreqs[note];
+
+      const now = titleMusicCtx.currentTime;
+      // soft attack, gentle sustain, slow fade
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.06, now + 0.05);
+      gain.gain.setValueAtTime(0.06, now + duration * 0.6);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.95);
+
+      osc.start(now);
+      osc.stop(now + duration);
+      titleMusicNodes.push(osc, gain);
+    }
+
+    noteIndex++;
+    titleMusicTimer = setTimeout(playNote, duration * 1000);
+  }
+
+  playNote();
+}
+
+function stopTitleMusic() {
+  if (titleMusicTimer) {
+    clearTimeout(titleMusicTimer);
+    titleMusicTimer = null;
+  }
+  titleMusicNodes.forEach(n => { try { n.disconnect(); } catch(e) {} });
+  titleMusicNodes = [];
+  if (titleMusicCtx) {
+    titleMusicCtx.close().catch(() => {});
+    titleMusicCtx = null;
+  }
+}
+
 let audioInitialized = false;
 function ensureAudio() {
   if (!audioInitialized) {
@@ -292,6 +391,8 @@ const state = {
 
 // ── Init ──
 
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
 function init() {
   resize();
   window.addEventListener('resize', resize);
@@ -310,6 +411,52 @@ function init() {
   // load faces
   loadFaces();
 
+  // mobile touch controls
+  if (isMobile) {
+    const touchControls = document.getElementById('touch-controls');
+    const mobileInput = document.getElementById('mobile-input');
+    touchControls.classList.add('visible');
+
+    // d-pad and action buttons
+    document.querySelectorAll('.touch-btn').forEach(btn => {
+      const key = btn.dataset.key;
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleKey({ key, preventDefault() {} });
+      }, { passive: false });
+    });
+
+    // prevent canvas touch from scrolling
+    canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+    // mobile keyboard for text input scenes
+    mobileInput.addEventListener('input', (e) => {
+      const val = mobileInput.value;
+      if (!val) return;
+      // simulate keypress for each new character
+      const lastChar = val.slice(-1);
+      handleKey({ key: lastChar, preventDefault() {} });
+      // clear after a tick to avoid accumulation
+      setTimeout(() => { mobileInput.value = ''; }, 0);
+    });
+
+    mobileInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' || e.key === 'Enter') {
+        e.preventDefault();
+        handleKey({ key: e.key, preventDefault() {} });
+      }
+    });
+
+    // auto-focus mobile input on text scenes
+    setInterval(() => {
+      const textScene = ['connect', 'vault', 'message'].includes(state.scene);
+      if (textScene && document.activeElement !== mobileInput) {
+        mobileInput.focus();
+      }
+    }, 500);
+  }
+
   // start render loop
   requestAnimationFrame(loop);
 }
@@ -317,15 +464,34 @@ function init() {
 function resize() {
   const maxW = window.innerWidth;
   const maxH = window.innerHeight;
-  const scale = Math.min(Math.floor(maxW / BASE_W), Math.floor(maxH / BASE_H)) || 1;
-  canvas.width = BASE_W * scale;
-  canvas.height = BASE_H * scale;
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const dpr = window.devicePixelRatio || 1;
+
+  // on mobile: fill screen (minus touch controls), use fractional scaling
+  // on desktop: integer scaling for crisp pixels
+  const touchH = isMobile ? 140 : 0;
+  const availH = maxH - touchH;
+
+  let scale;
+  if (isMobile) {
+    scale = Math.min(maxW / BASE_W, availH / BASE_H);
+  } else {
+    scale = Math.min(Math.floor(maxW / BASE_W), Math.floor(maxH / BASE_H)) || 1;
+  }
+
+  const cssW = Math.floor(BASE_W * scale);
+  const cssH = Math.floor(BASE_H * scale);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.floor(BASE_W * scale * dpr);
+  canvas.height = Math.floor(BASE_H * scale * dpr);
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 }
 
 function loadFaces() {
+  state.facesLoaded = 0;
   PERSONAS.forEach(p => {
+    if (state.faces[p.id]) { state.facesLoaded++; return; } // already loaded
     const img = new Image();
     img.onload = () => {
       state.faces[p.id] = img;
@@ -522,6 +688,9 @@ function drawFace(personaId, x, y, size = 48, full = false) {
 // ── Title Screen ──
 
 function renderTitle() {
+  // start music on title screen (requires user gesture — ensureAudio handles first keypress)
+  if (audioInitialized && !titleMusicTimer) startTitleMusic();
+
   const cx = BASE_W / 2;
   const cy = BASE_H / 2;
 
@@ -1330,6 +1499,8 @@ function renderMessage() {
 
 // ── MCP Connection ──
 
+const MAX_RESPONSE = 102400; // 100KB max response from proxy
+
 async function mcpCall(tool, args = {}) {
   try {
     const headers = { 'Content-Type': 'application/json' };
@@ -1341,7 +1512,9 @@ async function mcpCall(tool, args = {}) {
       headers,
       body: JSON.stringify({ tool, args }),
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    if (text.length > MAX_RESPONSE) throw new Error('Response too large');
+    const data = JSON.parse(text);
     if (data.ok) return data.result;
     throw new Error(data.error || 'MCP call failed');
   } catch (e) {
@@ -1361,7 +1534,14 @@ async function connectToServer(url) {
       state.connected = true;
       state.proxyAvailable = true;
       state.scene = 'menu';
-      showDialog('mira-chen', `Connected via proxy to ${url.replace('https://', '').split('.')[0]}. All MCP tools available.`);
+
+      // fetch live data in parallel
+      fetchPersonas();
+      fetchSkills();
+      fetchAuthorProfile();
+
+      const serverName = url.replace('https://', '').replace('http://', '').split('.')[0].split('/')[0];
+      showDialog('mira-chen', `Connected to ${serverName}. Loading team, skills, profile...`);
       return;
     }
   } catch (_) {}
@@ -1371,7 +1551,124 @@ async function connectToServer(url) {
   state.proxyAvailable = false;
   state.serverUrl = url;
   state.scene = 'menu';
-  showDialog('ghost', `Proxy not running. Start it: node proxy.js. Running in offline mode.`);
+  showDialog('ghost', `Proxy not running. Start it: node proxy.js. Running in offline mode with cached data.`);
+}
+
+// ── Dynamic Data Fetching ──
+
+const STAT_COLORS = ['#44ccff', '#ff88aa', '#aaaaaa', '#cc88ff', '#ffcc44', '#ffaa44', '#44ddaa',
+  '#ff6644', '#66aaff', '#dd8844', '#ff66cc', '#44ccff', '#ff4466', '#aa44ff'];
+
+async function fetchPersonas() {
+  const result = await mcpCall('list_personas');
+  if (!result) return;
+
+  const lines = result.split('\n');
+  const personas = [];
+  for (const line of lines) {
+    // format: "  slug           Name — Role — Subtitle"  or  "  slug           Name — Role"
+    const m = line.match(/^\s{2}(\S+)\s{2,}(.+?)\s*—\s*(.+)$/);
+    if (!m) continue;
+    const [, slug, name, roleStr] = m;
+
+    // build sprite ID from name: "Axel Brandt" → "axel-brandt", "Ghost" → "ghost"
+    // sanitize: only allow a-z, 0-9, hyphens — no path traversal
+    const nameId = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '').slice(0, 64);
+
+    // try to find existing persona by slug, name-based ID, or name match
+    const existing = PERSONAS.find(p =>
+      p.id === slug || p.id === nameId || p.name === name.trim());
+
+    const color = STAT_COLORS[personas.length % STAT_COLORS.length];
+    personas.push({
+      id: existing?.id || nameId || slug,
+      name: name.trim(),
+      role: roleStr.trim(),
+      color: existing?.color || color,
+      lv: existing?.lv || 30 + (slug.length * 3 % 20),
+      hp: existing?.hp || 600 + (slug.length * 7 % 300),
+      hpMax: existing?.hpMax || 900,
+      mp: existing?.mp || 150 + (slug.length * 11 % 150),
+      mpMax: existing?.mpMax || 300,
+      stats: existing?.stats || { STR: 0.5 + (slug.charCodeAt(0) % 40) / 100,
+        INT: 0.5 + (slug.charCodeAt(1 % slug.length) % 40) / 100,
+        WIS: 0.5 + (slug.charCodeAt(2 % slug.length) % 40) / 100,
+        DEX: 0.5 + (slug.charCodeAt(3 % slug.length) % 40) / 100,
+        CHA: 0.5 + (slug.charCodeAt(4 % slug.length) % 40) / 100 },
+      desc: existing?.desc || roleStr.trim(),
+    });
+  }
+  if (personas.length > 0) {
+    PERSONAS = personas;
+    loadFaces(); // reload sprites for new/updated persona IDs
+  }
+}
+
+async function fetchSkills() {
+  const result = await mcpCall('list_skills');
+  if (!result) return;
+
+  const lines = result.split('\n');
+  const skills = [];
+  const catIcons = { tech: '🔧', workflow: '⚙', cars: '🏎', business: '📊',
+    security: '🛡', writing: '🖊', roadmap: '🗺', default: '📄' };
+
+  for (const line of lines) {
+    // format: "  slug           [category] Name — subtitle"
+    const m = line.match(/^\s{2}(\S+)\s+\[(\w+)\]\s+(.+)$/);
+    if (!m) continue;
+    const [, slug, cat, title] = m;
+    const name = title.replace(/\s*—.*$/, '').trim();
+    const category = cat.toLowerCase();
+    skills.push({
+      id: slug,
+      name,
+      cat: category,
+      icon: catIcons[category] || catIcons.default,
+      locked: true,
+    });
+  }
+  if (skills.length > 0) {
+    SKILLS = skills;
+    for (const s of skills) {
+      if (!SKILL_CATEGORIES[s.cat]) {
+        SKILL_CATEGORIES[s.cat] = { color: '#888888', label: s.cat.charAt(0).toUpperCase() + s.cat.slice(1) };
+      }
+    }
+  }
+}
+
+async function fetchAuthorProfile() {
+  const result = await mcpCall('get_author_profile');
+  if (!result) return;
+
+  const lines = result.split('\n');
+
+  // parse key: value lines
+  for (const line of lines) {
+    const m = line.match(/^([A-Z][A-Z\s]*?):\s+(.+)$/);
+    if (!m) continue;
+    const key = m[1].trim().toUpperCase();
+    const val = m[2].trim();
+    if (key === 'AUTHOR' || key === 'NICKNAME') AUTHOR.name = val;
+    else if (key === 'SERVER') AUTHOR.server = val;
+  }
+
+  // extract bio from WHO I AM section
+  const whoMatch = result.match(/WHO I AM:\n([\s\S]*?)(?:\n\n[A-Z]|\n\nCONTENT)/);
+  if (whoMatch) {
+    AUTHOR.bio = whoMatch[1].trim().split('\n')[0]; // first paragraph
+  }
+
+  // extract content stats
+  const piecesMatch = result.match(/(\d+)\s+public pieces/);
+  const lockedMatch = result.match(/(\d+)\s+locked pieces/);
+  if (piecesMatch) AUTHOR.stats.pieces = parseInt(piecesMatch[1]);
+  if (lockedMatch) AUTHOR.stats.locked = parseInt(lockedMatch[1]);
+
+  // update live counts
+  AUTHOR.stats.personas = PERSONAS.length;
+  AUTHOR.stats.skills = SKILLS.length;
 }
 
 async function fetchContent() {
@@ -1588,6 +1885,7 @@ async function sendMessage(text) {
 function handleSelect() {
   switch (state.scene) {
     case 'title':
+      stopTitleMusic();
       state.scene = 'connect';
       state.inputText = '';
       state.tokenInput = '';

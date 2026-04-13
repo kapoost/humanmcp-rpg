@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src http://localhost:3001">
   <title>humanMCP — RPG Client</title>
   <style>
@@ -27,10 +27,80 @@
       display: block;
       margin: 0 auto;
     }
+
+    /* Mobile touch controls */
+    #touch-controls {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 140px;
+      z-index: 10;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #touch-controls.visible { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
+    .touch-btn {
+      pointer-events: auto;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: rgba(100, 120, 180, 0.35);
+      border: 2px solid rgba(140, 160, 220, 0.5);
+      color: rgba(200, 210, 255, 0.8);
+      font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .touch-btn:active { background: rgba(100, 120, 180, 0.6); }
+    .dpad { position: relative; width: 140px; height: 140px; }
+    .dpad .touch-btn { position: absolute; }
+    .dpad .up    { top: 0; left: 44px; }
+    .dpad .down  { bottom: 0; left: 44px; }
+    .dpad .left  { top: 44px; left: 0; }
+    .dpad .right { top: 44px; right: 0; }
+    .action-btns { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .action-btns .touch-btn { font-size: 14px; font-weight: bold; font-family: 'Courier New', monospace; }
+    .action-btns .btn-a { background: rgba(80, 160, 80, 0.4); border-color: rgba(100, 200, 100, 0.5); }
+    .action-btns .btn-b { background: rgba(180, 80, 80, 0.4); border-color: rgba(220, 100, 100, 0.5); }
+    .action-btns .btn-tab { width: 72px; border-radius: 12px; font-size: 11px; background: rgba(100, 100, 140, 0.3); border-color: rgba(140, 140, 180, 0.4); }
+
+    /* Hidden input for mobile keyboard */
+    #mobile-input {
+      position: fixed;
+      top: -100px;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      font-size: 16px; /* prevents iOS zoom */
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      body { touch-action: none; }
+    }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <!-- Mobile touch controls -->
+  <div id="touch-controls">
+    <div class="dpad">
+      <div class="touch-btn up" data-key="ArrowUp">&#9650;</div>
+      <div class="touch-btn down" data-key="ArrowDown">&#9660;</div>
+      <div class="touch-btn left" data-key="ArrowLeft">&#9664;</div>
+      <div class="touch-btn right" data-key="ArrowRight">&#9654;</div>
+    </div>
+    <div class="action-btns">
+      <div class="touch-btn btn-a" data-key="Enter">A</div>
+      <div class="touch-btn btn-b" data-key="Escape">B</div>
+      <div class="touch-btn btn-tab" data-key="Tab">TAB</div>
+    </div>
+  </div>
+  <input id="mobile-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
   <script src="engine.js"></script>
 </body>
 </html>
