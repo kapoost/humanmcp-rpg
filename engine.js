@@ -279,10 +279,13 @@ const state = {
   messageText: '',
   messageSent: false,
   proxyAvailable: false,
+  proxyToken: '',
   serverUrl: '',
   connected: false,
   inputActive: false,
   inputText: '',
+  tokenInput: '',
+  connectField: 0,  // 0 = URL, 1 = token
   inputCallback: null,
   starField: [],
 };
@@ -559,25 +562,34 @@ function renderTitle() {
 // ── Connect Screen ──
 
 function renderConnect() {
-  drawBox(40, 80, BASE_W - 80, 160);
+  drawBox(40, 60, BASE_W - 80, 200);
 
-  drawText('Connect to humanMCP Server', 60, 105, COLORS.textHighlight);
-  drawText('Enter server URL:', 60, 130, COLORS.text);
+  drawText('Connect to humanMCP Server', 60, 85, COLORS.textHighlight);
 
-  // input field
-  const inputY = 145;
+  // URL field
+  const urlActive = state.connectField === 0;
+  drawText('Server URL:', 60, 108, urlActive ? COLORS.text : COLORS.textDisabled);
   ctx.fillStyle = '#000';
-  ctx.fillRect(58, inputY - 10, BASE_W - 120, 18);
-  ctx.strokeStyle = COLORS.dialogBorderInner;
-  ctx.strokeRect(58, inputY - 10, BASE_W - 120, 18);
+  ctx.fillRect(58, 114, BASE_W - 120, 18);
+  ctx.strokeStyle = urlActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 114, BASE_W - 120, 18);
+  const urlCursor = urlActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+  drawText(state.inputText + urlCursor, 62, 126, COLORS.text, 9);
 
-  const displayText = state.inputText + (Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '');
-  drawText(displayText, 62, inputY + 2, COLORS.text, 10);
+  // Token field
+  const tokenActive = state.connectField === 1;
+  drawText('Proxy token (from node proxy.js):', 60, 148, tokenActive ? COLORS.text : COLORS.textDisabled);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(58, 154, BASE_W - 120, 18);
+  ctx.strokeStyle = tokenActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 154, BASE_W - 120, 18);
+  const tokCursor = tokenActive && Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+  const tokDisplay = state.proxyToken ? state.proxyToken.slice(0, 8) + '...' + tokCursor : tokCursor;
+  drawText(state.tokenInput + tokCursor, 62, 166, COLORS.text, 9);
 
-  drawText('ENTER — connect    ESC — back', 60, 200, COLORS.textDisabled, 8);
-
-  // preset hint
-  drawText('Default: https://kapoost-humanmcp.fly.dev', 60, 220, COLORS.textDisabled, 8);
+  drawText('TAB — switch field    ENTER — connect    ESC — back', 60, 200, COLORS.textDisabled, 8);
+  drawText('Leave token empty for offline mode', 60, 216, COLORS.textDisabled, 8);
+  drawText('Default: https://kapoost-humanmcp.fly.dev', 60, 232, COLORS.textDisabled, 8);
 }
 
 // ── Main Menu ──
@@ -1320,9 +1332,13 @@ function renderMessage() {
 
 async function mcpCall(tool, args = {}) {
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (state.proxyToken) {
+      headers['Authorization'] = `Bearer ${state.proxyToken}`;
+    }
     const resp = await fetch(`${PROXY_URL}/call`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ tool, args }),
     });
     const data = await resp.json();
@@ -1478,22 +1494,30 @@ function handleKey(e) {
 }
 
 function handleConnectInput(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    state.connectField = state.connectField === 0 ? 1 : 0;
+    return;
+  }
   if (e.key === 'Enter') {
     const url = state.inputText.trim() || 'https://kapoost-humanmcp.fly.dev/mcp';
+    state.proxyToken = state.tokenInput.trim();
     connectToServer(url);
     return;
   }
   if (e.key === 'Escape') {
     state.scene = 'title';
     state.inputText = '';
+    state.tokenInput = '';
     return;
   }
-  if (e.key === 'Backspace') {
-    state.inputText = state.inputText.slice(0, -1);
-    return;
-  }
-  if (e.key.length === 1) {
-    state.inputText += e.key;
+  // route to active field
+  if (state.connectField === 0) {
+    if (e.key === 'Backspace') { state.inputText = state.inputText.slice(0, -1); return; }
+    if (e.key.length === 1 && state.inputText.length < 200) { state.inputText += e.key; }
+  } else {
+    if (e.key === 'Backspace') { state.tokenInput = state.tokenInput.slice(0, -1); return; }
+    if (e.key.length === 1 && state.tokenInput.length < 64) { state.tokenInput += e.key; }
   }
 }
 
@@ -1566,6 +1590,8 @@ function handleSelect() {
     case 'title':
       state.scene = 'connect';
       state.inputText = '';
+      state.tokenInput = '';
+      state.connectField = 0;
       break;
 
     case 'dialog':

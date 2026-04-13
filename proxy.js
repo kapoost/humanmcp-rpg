@@ -4,16 +4,43 @@
 
 import http from 'http';
 import https from 'https';
+import crypto from 'crypto';
 
 const args = process.argv.slice(2);
 const PORT = parseInt(args[args.indexOf('--port') + 1]) || 3001;
 const MCP_URL = args[args.indexOf('--mcp') + 1] || 'https://kapoost-humanmcp.fly.dev/mcp';
+const ORIGIN = args[args.indexOf('--origin') + 1] || 'http://localhost:8080';
+const MAX_BODY = 10240; // 10KB max request body
+
+// Session token — printed at startup, required for all /call requests
+const TOKEN = crypto.randomBytes(16).toString('hex');
+
+// Tool allowlist — only safe, read-oriented + comment/message tools
+const ALLOWED_TOOLS = new Set([
+  'get_author_profile',
+  'list_content',
+  'read_content',
+  'verify_content',
+  'get_certificate',
+  'list_personas',
+  'get_persona',
+  'list_skills',
+  'get_skill',
+  'list_blobs',
+  'query_vault',
+  'recall',
+  'leave_comment',
+  'leave_message',
+  'request_access',
+  'submit_answer',
+  'about_humanmcp',
+]);
 
 const server = http.createServer(async (req, res) => {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS — restricted to configured origin
+  res.setHeader('Access-Control-Allow-Origin', ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -21,20 +48,52 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Health check
+  // Health check (no auth required — doesn't expose sensitive data)
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', mcp: MCP_URL }));
+    res.end(JSON.stringify({ status: 'ok' }));
     return;
   }
 
   // Proxy MCP tool call: POST /call { tool, args }
   if (req.method === 'POST' && req.url === '/call') {
+    // Auth check
+    const authHeader = req.headers['authorization'] || '';
+    if (authHeader !== `Bearer ${TOKEN}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'Unauthorized. Pass token as Bearer header.' }));
+      return;
+    }
+
+    // Body size limit
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let bodySize = 0;
+    let aborted = false;
+
+    req.on('data', chunk => {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY) {
+        aborted = true;
+        req.destroy();
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Request too large' }));
+        return;
+      }
+      body += chunk;
+    });
+
     req.on('end', async () => {
+      if (aborted) return;
       try {
         const { tool, args: toolArgs } = JSON.parse(body);
+
+        // Tool allowlist check
+        if (!ALLOWED_TOOLS.has(tool)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: `Tool '${tool}' not allowed` }));
+          return;
+        }
+
         const result = await callMcp(tool, toolArgs || {});
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, result }));
@@ -55,7 +114,7 @@ function callMcp(tool, args) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({
       jsonrpc: '2.0',
-      id: Date.now(),
+      id: crypto.randomUUID(),
       method: 'tools/call',
       params: { name: tool, arguments: args },
     });
@@ -108,13 +167,13 @@ function callMcp(tool, args) {
 }
 
 server.listen(PORT, () => {
-  console.log(`humanMCP proxy running on http://localhost:${PORT}`);
-  console.log(`Proxying to: ${MCP_URL}`);
-  console.log(`\nEndpoints:`);
-  console.log(`  GET  /health     — status check`);
-  console.log(`  POST /call       — { tool, args } → MCP tool call`);
-  console.log(`\nExample:`);
-  console.log(`  curl -X POST http://localhost:${PORT}/call \\`);
-  console.log(`    -H 'Content-Type: application/json' \\`);
-  console.log(`    -d '{"tool":"list_content","args":{}}'`);
+  console.log(`\n  humanMCP RPG Proxy`);
+  console.log(`  ──────────────────`);
+  console.log(`  Port:   http://localhost:${PORT}`);
+  console.log(`  MCP:    ${MCP_URL}`);
+  console.log(`  Origin: ${ORIGIN}`);
+  console.log(`  Token:  ${TOKEN}`);
+  console.log(`\n  ⚠ Pass this token to the client to authorize requests.`);
+  console.log(`  Allowed tools: ${[...ALLOWED_TOOLS].join(', ')}`);
+  console.log(``);
 });
