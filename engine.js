@@ -835,6 +835,81 @@ function generateAvatar(name, size) {
   return cvs;
 }
 
+// ── Author Avatar (kapoost — hand-drawn pixel art) ──
+
+function generateAuthorAvatar() {
+  if (avatarCache['__author__']) return avatarCache['__author__'];
+
+  const W = 12, H = 16, px = 4;
+  const cvs = document.createElement('canvas');
+  cvs.width = W * px;
+  cvs.height = H * px;
+  const c = cvs.getContext('2d');
+
+  // palette
+  const hair = '#1a1a2e';    // long black hair
+  const skin = '#d4a373';    // warm skin
+  const beard = '#2a2a3e';   // dark beard
+  const eye = '#1a1a1a';
+  const jacket = '#1b3a5c';  // navy sailor jacket
+  const shirt = '#e8e0d0';   // white undershirt
+  const jeans = '#2c4a6e';   // dark jeans
+  const boot = '#3a2a1a';    // brown boots
+  const outline = '#111111';
+
+  // pixel map: [row][col] = color, null = transparent
+  const grid = [
+    //  0     1     2     3     4     5     6     7     8     9    10    11
+    [null, null, null,  hair, hair, hair, hair, hair, hair, null, null, null],  // 0  hair top
+    [null, null,  hair, hair, hair, hair, hair, hair, hair, hair, null, null],  // 1  hair
+    [null,  hair, hair, hair, skin, skin, skin, skin, hair, hair, hair, null],  // 2  hair + forehead
+    [null,  hair, hair, skin, eye,  skin, skin, eye,  skin, hair, hair, null],  // 3  eyes
+    [null,  hair, hair, skin, skin, skin, skin, skin, skin, hair, hair, null],  // 4  nose
+    [null,  hair, hair, beard,beard,'#cc6655',skin,beard,beard,hair, hair, null],  // 5  mouth + beard
+    [null,  hair, hair, beard,beard,beard,beard,beard,beard,hair, hair, null],  // 6  beard
+    [null,  hair, null, skin, skin, skin, skin, skin, skin, null, hair, null],  // 7  neck + hair sides
+    [null,  hair,jacket,jacket,shirt,shirt,shirt,shirt,jacket,jacket,hair, null],  // 8  collar
+    [null,  hair,jacket,jacket,jacket,shirt,shirt,jacket,jacket,jacket,hair, null],  // 9  jacket
+    [null,  hair, skin,jacket,jacket,jacket,jacket,jacket,jacket, skin, hair, null],  // 10 jacket + arms
+    [null,  hair, skin,jacket,jacket,jacket,jacket,jacket,jacket, skin, hair, null],  // 11 jacket + hands
+    [null, null, null,jacket,jacket,jacket,jacket,jacket,jacket, null, null, null],  // 12 belt
+    [null, null, null, jeans, jeans, null, null, jeans, jeans, null, null, null],  // 13 legs
+    [null, null, null, jeans, jeans, null, null, jeans, jeans, null, null, null],  // 14 legs
+    [null, null, null, boot,  boot, null, null,  boot,  boot, null, null, null],  // 15 boots
+  ];
+
+  // draw with outline
+  // first pass: outline
+  for (let r = 0; r < H; r++) {
+    for (let col = 0; col < W; col++) {
+      if (grid[r][col]) continue;
+      const neighbors = [
+        r > 0 && grid[r-1][col],
+        r < H-1 && grid[r+1][col],
+        col > 0 && grid[r][col-1],
+        col < W-1 && grid[r][col+1],
+      ];
+      if (neighbors.some(Boolean)) {
+        c.fillStyle = outline;
+        c.fillRect(col * px, r * px, px, px);
+      }
+    }
+  }
+
+  // second pass: fill
+  for (let r = 0; r < H; r++) {
+    for (let col = 0; col < W; col++) {
+      if (grid[r][col]) {
+        c.fillStyle = grid[r][col];
+        c.fillRect(col * px, r * px, px, px);
+      }
+    }
+  }
+
+  avatarCache['__author__'] = cvs;
+  return cvs;
+}
+
 // ── Title Screen ──
 
 function renderTitle() {
@@ -926,16 +1001,14 @@ function renderMenu() {
   // header box
   drawBox(10, 8, BASE_W - 20, 40);
 
-  // server icon — author initial in colored circle
-  ctx.fillStyle = COLORS.dialogBg;
-  ctx.fillRect(18, 14, 28, 28);
+  // author avatar in header
+  const hdrAvatar = generateAuthorAvatar();
+  const hdrScale = Math.min(28 / hdrAvatar.width, 28 / hdrAvatar.height);
+  const hdrW = Math.floor(hdrAvatar.width * hdrScale);
+  const hdrH = Math.floor(hdrAvatar.height * hdrScale);
+  ctx.drawImage(hdrAvatar, 18 + (28 - hdrW) / 2, 14 + (28 - hdrH) / 2, hdrW, hdrH);
   ctx.strokeStyle = COLORS.dialogBorder;
   ctx.strokeRect(18, 14, 28, 28);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = COLORS.textHighlight;
-  ctx.font = 'bold 14px "Courier New", monospace';
-  ctx.fillText(AUTHOR.name.charAt(0).toUpperCase(), 32, 33);
-  ctx.textAlign = 'left';
   drawText('humanMCP', 52, 27, COLORS.textHighlight, 12);
   drawText(state.serverUrl.replace('https://', '').replace('/mcp', ''), 52, 40, COLORS.textDisabled, 8);
 
@@ -1504,7 +1577,13 @@ function renderAboutProfile(cardX, cardY, cardW, areaH) {
   let y = cardY + 16 - scroll;
 
   // face + name
-  drawFace('mira-chen', cardX + 14, y - 2, 48);
+  const authorAvatar = generateAuthorAvatar();
+  const avScale = Math.min(48 / authorAvatar.width, 48 / authorAvatar.height);
+  const avW = Math.floor(authorAvatar.width * avScale);
+  const avH = Math.floor(authorAvatar.height * avScale);
+  ctx.drawImage(authorAvatar, cardX + 14 + (48 - avW) / 2, y - 2 + (48 - avH) / 2, avW, avH);
+  ctx.strokeStyle = COLORS.dialogBorder;
+  ctx.strokeRect(cardX + 14, y - 2, 48, 48);
   drawText(AUTHOR.name, cardX + 72, y + 10, COLORS.textHighlight, 14);
   AUTHOR.roles.forEach((role, i) => {
     drawText(role, cardX + 72, y + 26 + i * 12, COLORS.dialogBorder, 9);
