@@ -33,61 +33,63 @@ const COLORS = {
 // ── Persona Data ──
 
 // Default personas — overwritten by live MCP data on connect
+// Engine: Claude Sonnet 4 (all personas) | Haiku 4.5 (notatnik) | Ollama fallback
+// Routing: AI picks one best-match persona per conversation chunk — no clutter
 let PERSONAS = [
   { id: 'mira-chen', name: 'Mira Chen', role: 'Principal Engineer', color: '#88ccff',
-    lv: 42, hp: 920, hpMax: 920, mp: 180, mpMax: 200,
+    lv: 42, hp: 920, hpMax: 920, mp: 180, mpMax: 200, engine: 'sonnet',
     stats: { STR: 0.5, INT: 0.95, WIS: 0.85, DEX: 0.6, CHA: 0.7 },
     desc: 'Edge-first architecture, system design, tech decisions. Thinks in diagrams.' },
   { id: 'eleanor-voss', name: 'Eleanor Voss', role: 'UX/UI Designer', color: '#ff88aa',
-    lv: 38, hp: 780, hpMax: 780, mp: 150, mpMax: 150,
+    lv: 38, hp: 780, hpMax: 780, mp: 150, mpMax: 150, engine: 'sonnet',
     stats: { STR: 0.3, INT: 0.8, WIS: 0.9, DEX: 0.85, CHA: 0.8 },
     desc: 'Information architecture, typography, visual hierarchy. Makes complexity legible.' },
   { id: 'ghost', name: 'Ghost', role: 'Red Team Consultant', color: '#aaaaaa',
-    lv: 50, hp: 666, hpMax: 666, mp: 300, mpMax: 300,
+    lv: 50, hp: 666, hpMax: 666, mp: 300, mpMax: 300, engine: 'sonnet',
     stats: { STR: 0.7, INT: 0.9, WIS: 0.95, DEX: 0.9, CHA: 0.3 },
     desc: 'White hat operations, threat modeling, code audit. Trusts nothing.' },
   { id: 'hermiona', name: 'Hermiona', role: 'Intent Analyst & Doc Owner', color: '#cc88ff',
-    lv: 35, hp: 650, hpMax: 650, mp: 220, mpMax: 220,
+    lv: 35, hp: 650, hpMax: 650, mp: 220, mpMax: 220, engine: 'sonnet',
     stats: { STR: 0.3, INT: 0.85, WIS: 0.9, DEX: 0.5, CHA: 0.8 },
     desc: 'Context keeper, documentation ownership, intent analysis. Remembers everything.' },
   { id: 'george-carlin', name: 'George Carlin', role: 'Comedian & Social Critic', color: '#ffcc44',
-    lv: 55, hp: 500, hpMax: 500, mp: 400, mpMax: 400,
+    lv: 55, hp: 500, hpMax: 500, mp: 400, mpMax: 400, engine: 'sonnet',
     stats: { STR: 0.6, INT: 0.85, WIS: 0.95, DEX: 0.4, CHA: 1.0 },
     desc: 'End-of-council voice. Uncomfortable truths, reframing. Words as weapons.' },
-  { id: 'harvey', name: 'Harvey', role: 'Prawnik — IP & Privacy', color: '#ffaa44',
-    lv: 48, hp: 750, hpMax: 750, mp: 180, mpMax: 180,
+  { id: 'harvey', name: 'Harvey', role: 'Prawnik — IP & Privacy', color: '#aa88ff',
+    lv: 48, hp: 750, hpMax: 750, mp: 180, mpMax: 180, engine: 'sonnet',
     stats: { STR: 0.8, INT: 0.85, WIS: 0.7, DEX: 0.6, CHA: 0.95 },
     desc: 'IP, privacy, copyright, jurisdiction, corporate structures. Law is leverage.' },
-  { id: 'hermes', name: 'Hermes', role: 'Process Optimizer', color: '#44ddaa',
-    lv: 36, hp: 600, hpMax: 600, mp: 250, mpMax: 250,
+  { id: 'hermes', name: 'Hermes', role: 'Process Optimizer', color: '#4488ff',
+    lv: 36, hp: 600, hpMax: 600, mp: 250, mpMax: 250, engine: 'sonnet',
     stats: { STR: 0.3, INT: 0.8, WIS: 0.85, DEX: 0.8, CHA: 0.7 },
     desc: 'Systems thinking, workflow optimization, process design. Flow over friction.' },
-  { id: 'axel-brandt', name: 'Axel Brandt', role: 'Principal QA Engineer', color: '#ff6644',
-    lv: 40, hp: 850, hpMax: 850, mp: 120, mpMax: 120,
+  { id: 'axel-brandt', name: 'Axel Brandt', role: 'Principal QA Engineer', color: '#ffaa00',
+    lv: 40, hp: 850, hpMax: 850, mp: 120, mpMax: 120, engine: 'sonnet',
     stats: { STR: 0.85, INT: 0.8, WIS: 0.7, DEX: 0.75, CHA: 0.4 },
     desc: 'Adversarial testing, edge cases, breaking assumptions. Finds what you missed.' },
   { id: 'kenji-mori', name: 'Kenji Mori', role: 'Master Mechanic', color: '#66aaff',
-    lv: 39, hp: 800, hpMax: 800, mp: 100, mpMax: 100,
+    lv: 39, hp: 800, hpMax: 800, mp: 100, mpMax: 100, engine: 'sonnet',
     stats: { STR: 0.9, INT: 0.7, WIS: 0.85, DEX: 0.8, CHA: 0.5 },
     desc: 'Japanese classic cars, diagnostics, restoration. Listens to engines.' },
-  { id: 'lukasz-mazur', name: 'Lukasz Mazur', role: 'The Contrarian', color: '#dd8844',
-    lv: 45, hp: 700, hpMax: 700, mp: 280, mpMax: 280,
+  { id: 'lukasz-mazur', name: 'Lukasz Mazur', role: 'The Contrarian', color: '#ff6600',
+    lv: 45, hp: 700, hpMax: 700, mp: 280, mpMax: 280, engine: 'sonnet',
     stats: { STR: 0.6, INT: 0.9, WIS: 0.95, DEX: 0.5, CHA: 0.7 },
     desc: 'Philosophical devil\'s advocate. Questions everything, especially consensus.' },
   { id: 'sophia-marchetti', name: 'Sophia Marchetti', role: 'Persuasion Specialist', color: '#ff66cc',
-    lv: 41, hp: 680, hpMax: 680, mp: 190, mpMax: 190,
+    lv: 41, hp: 680, hpMax: 680, mp: 190, mpMax: 190, engine: 'sonnet',
     stats: { STR: 0.5, INT: 0.8, WIS: 0.85, DEX: 0.65, CHA: 0.95 },
     desc: 'Communication, influence, framing. Makes people want what you\'re offering.' },
   { id: 'tomas-reyes', name: 'Tomas Reyes', role: 'Data Architect & ML Engineer', color: '#44ccff',
-    lv: 37, hp: 720, hpMax: 720, mp: 220, mpMax: 220,
+    lv: 37, hp: 720, hpMax: 720, mp: 220, mpMax: 220, engine: 'sonnet',
     stats: { STR: 0.4, INT: 0.95, WIS: 0.7, DEX: 0.8, CHA: 0.5 },
     desc: 'Data pipelines, ML models, architecture. Speaks in queries and tensors.' },
   { id: 'yuki-tanaka', name: 'Yuki Tanaka', role: 'Blue Team — Threat Hunter', color: '#ff4466',
-    lv: 44, hp: 800, hpMax: 800, mp: 170, mpMax: 170,
+    lv: 44, hp: 800, hpMax: 800, mp: 170, mpMax: 170, engine: 'sonnet',
     stats: { STR: 0.75, INT: 0.8, WIS: 0.8, DEX: 0.85, CHA: 0.5 },
     desc: 'Defensive security, threat hunting, incident response. Protects with honor.' },
   { id: 'zara', name: 'Zara', role: 'AI Whisperer & Prompt Engineer', color: '#aa44ff',
-    lv: 99, hp: 999, hpMax: 999, mp: 999, mpMax: 999,
+    lv: 99, hp: 999, hpMax: 999, mp: 999, mpMax: 999, engine: 'sonnet',
     stats: { STR: 0.6, INT: 0.95, WIS: 1.0, DEX: 0.7, CHA: 0.85 },
     desc: 'Multi-agent architect, MCP instructions owner. Entropy is her medium.' },
 ];
@@ -103,6 +105,8 @@ const FACE_REMAP = {
 
 // Default skills — overwritten by live MCP data on connect
 let SKILLS = [
+  { id: 'notatnik', name: 'Notatnik', cat: 'workflow', icon: '\u{1f4dd}', locked: false,
+    desc: 'Live meeting scribe (Haiku 4.5). Always active. Rolling notes \u2014 adds, edits, never rewrites.' },
   { id: 'a2a-resources-roadmap', name: 'Roadmap', cat: 'roadmap', icon: '🗺', locked: true },
   { id: 'agent-system-prompt', name: 'Session Protocol', cat: 'workflow', icon: '⚙', locked: true },
   { id: 'deploy-workflow', name: 'Deploy Workflow', cat: 'tech', icon: '🚀', locked: true },
@@ -375,6 +379,30 @@ const state = {
   vaultQuery: '',
   vaultResults: null,
   vaultLoading: false,
+  vaultSource: 'local',  // 'local' (mysloodsiewnia) | 'mcp' (humanMCP)
+  vaultTypeFilter: 'all', // 'all' | 'pdf' | 'note' | 'contact' | 'transcript'
+  logItems: [],
+  logCursor: 0,
+  logBody: null,
+  logLoading: false,
+  naradaPrompt: '',
+  naradaResults: null,
+  naradaLoading: false,
+  naradaShowIdx: -1,
+  // Live transcription
+  liveWs: null,
+  liveRecorder: null,
+  liveStream: null,
+  liveActive: false,
+  liveElapsed: 0,
+  liveStartTime: 0,
+  liveBubbles: [],       // [{id, speaker, text, color, isPersona, time}]
+  liveSpeakers: {},       // {name: {color, seconds, percent, avatar}}
+  livePersonaQueue: [],   // incoming persona comments to stagger
+  liveScroll: 0,
+  liveSummary: null,
+  liveMood: null,        // {mood, icon, label, color}
+  liveMoodTime: 0,
   messageText: '',
   messageSent: false,
   proxyAvailable: false,
@@ -459,7 +487,7 @@ function init() {
 
     // auto-focus mobile input on text scenes
     setInterval(() => {
-      const textScene = ['connect', 'vault', 'message'].includes(state.scene);
+      const textScene = ['connect', 'vault', 'message', 'narada'].includes(state.scene);
       if (textScene && document.activeElement !== mobileInput) {
         mobileInput.focus();
       }
@@ -574,6 +602,10 @@ function render() {
     case 'about': renderAbout(); break;
     case 'vault': renderVault(); break;
     case 'message': renderMessage(); break;
+    case 'log': renderLog(); break;
+    case 'narada': renderNarada(); break;
+    case 'live': renderLive(); break;
+    case 'live-summary': renderLiveSummary(); break;
   }
 }
 
@@ -631,31 +663,35 @@ function drawText(text, x, y, color = COLORS.text, size = 10) {
 }
 
 function drawTextWrapped(text, x, y, maxWidth, color = COLORS.text, lineHeight = 14) {
-  const words = text.split(' ');
-  let line = '';
   let ly = y;
-
   ctx.font = '10px "Courier New", monospace';
 
-  for (const word of words) {
-    const test = line + (line ? ' ' : '') + word;
-    const metrics = ctx.measureText(test);
-    if (metrics.width > maxWidth && line) {
+  const paragraphs = text.split('\n');
+  for (const para of paragraphs) {
+    if (para.trim() === '') { ly += lineHeight * 0.5; continue; }
+    const words = para.split(' ');
+    let line = '';
+    for (const word of words) {
+      const test = line + (line ? ' ' : '') + word;
+      const metrics = ctx.measureText(test);
+      if (metrics.width > maxWidth && line) {
+        ctx.fillStyle = COLORS.shadow;
+        ctx.fillText(line, x + 1, ly + 1);
+        ctx.fillStyle = color;
+        ctx.fillText(line, x, ly);
+        line = word;
+        ly += lineHeight;
+      } else {
+        line = test;
+      }
+    }
+    if (line) {
       ctx.fillStyle = COLORS.shadow;
       ctx.fillText(line, x + 1, ly + 1);
       ctx.fillStyle = color;
       ctx.fillText(line, x, ly);
-      line = word;
       ly += lineHeight;
-    } else {
-      line = test;
     }
-  }
-  if (line) {
-    ctx.fillStyle = COLORS.shadow;
-    ctx.fillText(line, x + 1, ly + 1);
-    ctx.fillStyle = color;
-    ctx.fillText(line, x, ly);
   }
   return ly;
 }
@@ -1016,20 +1052,24 @@ function renderMenu() {
   const menuY = 56;
   const menuW = 160;
   const items = [
-    { label: 'Team', icon: '⚔', desc: 'View personas' },
-    { label: 'Skills', icon: '📖', desc: 'Browse skills' },
-    { label: 'Library', icon: '📜', desc: 'Read content' },
-    { label: 'Vault', icon: '🔮', desc: 'Query memory' },
-    { label: 'Message', icon: '✉', desc: 'Send message' },
-    { label: 'About', icon: '★', desc: 'Author profile' },
-    { label: 'Disconnect', icon: '✕', desc: 'Leave server' },
+    { label: 'Team', icon: '\u2694', desc: 'View personas' },
+    { label: 'Live', icon: '\u{1f3a4}', desc: 'Record & transcribe' },
+    { label: 'Skills', icon: '\u{1f4d6}', desc: 'Browse skills' },
+    { label: 'Library', icon: '\u{1f4dc}', desc: 'Read content' },
+    { label: 'Log', icon: '\u{1f4cb}', desc: 'Meeting transcripts' },
+    { label: 'Vault', icon: '\u{1f52e}', desc: 'Search local & MCP vault' },
+    { label: 'Narada', icon: '\u{1f4ac}', desc: 'Team brainstorm' },
+    { label: 'Message', icon: '\u2709', desc: 'Send message' },
+    { label: 'About', icon: '\u2605', desc: 'Author profile' },
+    { label: 'Disconnect', icon: '\u2715', desc: 'Leave server' },
   ];
   state.menuItems = items;
 
-  drawBox(menuX, menuY, menuW, items.length * 20 + 16);
+  const itemH = 18;
+  drawBox(menuX, menuY, menuW, items.length * itemH + 16);
 
   items.forEach((item, i) => {
-    const iy = menuY + 14 + i * 20;
+    const iy = menuY + 14 + i * itemH;
     const selected = state.menuCursor === i;
     if (selected) {
       drawCursor(menuX + 8, iy);
@@ -1041,8 +1081,9 @@ function renderMenu() {
 
   // description box
   const descItem = items[state.menuCursor];
-  drawBox(menuX, menuY + items.length * 20 + 24, menuW, 28);
-  drawText(descItem.desc, menuX + 10, menuY + items.length * 20 + 42, COLORS.dialogBorder, 9);
+  const menuBottom = menuY + items.length * itemH + 16;
+  drawBox(menuX, menuBottom + 4, menuW, 28);
+  drawText(descItem.desc, menuX + 10, menuBottom + 22, COLORS.dialogBorder, 9);
 
   // team preview panel
   const panelX = 180;
@@ -1207,7 +1248,9 @@ function renderTeam() {
     const infoX = detailX + 12 + faceSize + 10;
     drawText(sel.name, infoX, listY + 22, sel.color, 11);
     drawText(sel.role, infoX, listY + 36, COLORS.dialogBorder, 9);
+    const engineLabel = sel.engine === 'haiku' ? 'Haiku 4.5' : sel.engine === 'sonnet' ? 'Sonnet 4' : sel.engine || '';
     drawText(`Lv ${sel.lv}`, infoX, listY + 50, COLORS.textHighlight, 9);
+    if (engineLabel) drawText(engineLabel, infoX + 40, listY + 50, COLORS.textDisabled, 7);
 
     // HP / MP bars
     const barX = detailX + 12;
@@ -1707,7 +1750,18 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
 function renderVault() {
   drawBox(10, 8, BASE_W - 20, 24);
   drawText('Vault', 20, 24, COLORS.textHighlight, 11);
-  drawText('query kapoost\'s memory', BASE_W - 200, 24, COLORS.textDisabled, 8);
+
+  // source tabs
+  const srcLabel = state.vaultSource === 'local' ? 'mysloodsiewnia' : 'humanMCP';
+  const srcColor = state.vaultSource === 'local' ? '#B8860B' : '#88ccff';
+  drawText(srcLabel, BASE_W - 120, 24, srcColor, 8);
+  drawText('TAB switch', BASE_W - 120, 14, COLORS.textDisabled, 6);
+
+  // type filter in header (local only)
+  if (state.vaultSource === 'local') {
+    const typeLabels = { all: 'ALL', pdf: 'PDF', note: 'NOTE', contact: 'CONT', transcript: 'TRANS' };
+    drawText('\u25C4 ' + typeLabels[state.vaultTypeFilter] + ' \u25BA', 64, 24, COLORS.dialogBorder, 8);
+  }
 
   // search box
   drawBox(10, 40, BASE_W - 20, 36);
@@ -1716,7 +1770,7 @@ function renderVault() {
   ctx.fillRect(72, 50, BASE_W - 100, 18);
   ctx.strokeStyle = COLORS.dialogBorderInner;
   ctx.strokeRect(72, 50, BASE_W - 100, 18);
-  const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '█' : '';
+  const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '\u2588' : '';
   drawText(state.vaultQuery + cursor, 76, 63, COLORS.text, 9);
 
   // results
@@ -1725,12 +1779,17 @@ function renderVault() {
 
   if (state.vaultLoading) {
     drawText('Searching...', 24, resultY + 20, COLORS.textDisabled);
-    // spinning dots
     const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
     drawText(dots, 100, resultY + 20, COLORS.textHighlight);
   } else if (state.vaultResults === null) {
     drawText('Type a query and press Enter to search', 24, resultY + 20, COLORS.textDisabled);
-    drawText('Examples: "sailing", "deployment", "MX-5"', 24, resultY + 36, COLORS.textDisabled, 8);
+    if (state.vaultSource === 'local') {
+      drawText('PDFs, transcripts, notes, contacts', 24, resultY + 36, COLORS.textDisabled, 8);
+      drawText('Examples: "moment dokreca", "S2000", "rozmowa"', 24, resultY + 50, COLORS.textDisabled, 8);
+    } else {
+      drawText('kapoost\'s MCP memory & knowledge', 24, resultY + 36, COLORS.textDisabled, 8);
+      drawText('Examples: "sailing", "deployment", "MX-5"', 24, resultY + 50, COLORS.textDisabled, 8);
+    }
   } else if (state.vaultResults === '') {
     drawText('No results found.', 24, resultY + 20, COLORS.textDisabled);
   } else {
@@ -1744,7 +1803,8 @@ function renderVault() {
   }
 
   drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-  drawText('Type query   ENTER Search   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  const filterHint = state.vaultSource === 'local' ? '  L/R Filter' : '';
+  drawText('ENTER Search   TAB Source' + filterHint + '   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
 }
 
 // ── Message Scene ──
@@ -2073,6 +2133,7 @@ function handleKey(e) {
   if (state.scene === 'connect') { handleConnectInput(e); return; }
   if (state.scene === 'vault') { handleVaultInput(e); return; }
   if (state.scene === 'message') { handleMessageInput(e); return; }
+  if (state.scene === 'narada') { handleNaradaInput(e); return; }
 
   switch (e.key) {
     case 'Enter':
@@ -2105,7 +2166,7 @@ function handlePaste(e) {
   const text = (e.clipboardData || window.clipboardData).getData('text');
   if (!text) return;
 
-  const textScenes = ['connect', 'vault', 'message'];
+  const textScenes = ['connect', 'vault', 'message', 'narada'];
   if (!textScenes.includes(state.scene)) return;
 
   e.preventDefault();
@@ -2123,6 +2184,8 @@ function handlePaste(e) {
     state.vaultQuery = (state.vaultQuery + clean).slice(0, 200);
   } else if (state.scene === 'message' && !state.messageSent) {
     state.messageText = (state.messageText + clean).slice(0, 500);
+  } else if (state.scene === 'narada' && !state.naradaLoading) {
+    state.naradaPrompt = (state.naradaPrompt + clean).slice(0, 500);
   }
 }
 
@@ -2164,6 +2227,28 @@ function handleVaultInput(e) {
     state.scene = 'menu';
     return;
   }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    playSfx('cursor');
+    state.vaultSource = state.vaultSource === 'local' ? 'mcp' : 'local';
+    state.vaultTypeFilter = 'all';
+    state.vaultResults = null;
+    return;
+  }
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && state.vaultSource === 'local') {
+    const types = ['all', 'pdf', 'note', 'contact', 'transcript'];
+    let idx = types.indexOf(state.vaultTypeFilter);
+    idx = e.key === 'ArrowRight' ? (idx + 1) % types.length : (idx - 1 + types.length) % types.length;
+    state.vaultTypeFilter = types[idx];
+    playSfx('cursor');
+    state.vaultResults = null;
+    return;
+  }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    if (e.key === 'ArrowUp') state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
+    else state.aboutScroll = (state.aboutScroll || 0) + 20;
+    return;
+  }
   if (e.key === 'Enter' && state.vaultQuery.trim()) {
     playSfx('select');
     searchVault(state.vaultQuery.trim());
@@ -2179,21 +2264,52 @@ function handleVaultInput(e) {
   }
 }
 
+// Local vault URL — mysloodsiewnia on the same network
+const LOCAL_VAULT_URL = 'http://localhost:7331';
+
 async function searchVault(query) {
   state.vaultLoading = true;
   state.vaultResults = null;
-  const result = await mcpCall('query_vault', { query });
-  state.vaultLoading = false;
-  if (result) {
-    // check for backend errors and show friendly message
-    if (result.includes('niedostępna') || result.includes('offline') || result.includes('no such host') || result.includes('dial tcp')) {
-      state.vaultResults = 'Vault backend is offline. The author\'s local knowledge base is not currently running.';
-    } else {
-      state.vaultResults = result;
+
+  if (state.vaultSource === 'local') {
+    // Search mysloodsiewnia directly
+    try {
+      const body = { query, limit: 8 };
+      if (state.vaultTypeFilter !== 'all') body.doc_type = state.vaultTypeFilter;
+      const resp = await fetch(`${LOCAL_VAULT_URL}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (data.results && data.results.length > 0) {
+        state.vaultResults = data.results.map(r => {
+          const src = r.title || r.doc_slug || '';
+          const page = r.page ? ` str.${r.page}` : '';
+          const body = (r.body || '').slice(0, 300);
+          return `[${src}${page}]\n${body}`;
+        }).join('\n\n---\n\n');
+      } else {
+        state.vaultResults = '';
+      }
+    } catch (e) {
+      state.vaultResults = 'mysloodsiewnia offline. Start: python main.py';
     }
   } else {
-    state.vaultResults = 'Vault unavailable. Start proxy: node proxy.js';
+    // Search via humanMCP proxy
+    const result = await mcpCall('query_vault', { query });
+    if (result) {
+      if (result.includes('niedostępna') || result.includes('offline') || result.includes('no such host') || result.includes('dial tcp')) {
+        state.vaultResults = 'Vault backend is offline. The author\'s local knowledge base is not currently running.';
+      } else {
+        state.vaultResults = result;
+      }
+    } else {
+      state.vaultResults = 'Vault unavailable. Start proxy: node proxy.js';
+    }
   }
+  state.vaultLoading = false;
 }
 
 function handleMessageInput(e) {
@@ -2271,6 +2387,18 @@ function handleSelect() {
       playSfx('locked');
       showDialog('ghost', 'Skill content is locked. Use bootstrap_session with session code to unlock.');
       break;
+
+    case 'log':
+      handleLogSelect();
+      break;
+
+    case 'live':
+      if (!state.liveActive) {
+        startLiveSession();
+      } else {
+        saveLiveSession();
+      }
+      break;
   }
 }
 
@@ -2280,6 +2408,9 @@ const GEORGE_TIPS = {
   skills: "Skills. Locked, of course. Everything good in life is behind a paywall or a password. Welcome to the future.",
   content: "The library. A human wrote actual poems and put them on a server. In 2026. That's either brave or insane. I respect both.",
   vault: "The vault. You type a question, a machine searches a human's memory. We used to call that 'asking someone.' Progress!",
+  live: "You're about to record a conversation and have AIs comment on it in real time. We went from cave paintings to this. Remarkable.",
+  log: "Meeting transcripts. Proof that most meetings could've been emails. But at least now you have a record of the wasted time.",
+  narada: "Narada. You ask a question and fourteen AIs pretend to have a thoughtful discussion. Democracy of the simulated.",
   message: "You're about to send a message to a real human. Remember when that was the default? Now it feels revolutionary.",
   about: "The about page. Where you learn that behind all this code there's a sailor who writes poetry. The internet is a strange place.",
 };
@@ -2296,42 +2427,82 @@ function showGeorgeTip(scene) {
 }
 
 function handleMenuSelect() {
-  switch (state.menuCursor) {
-    case 0: // Team
+  const labels = state.menuItems.map(i => i.label);
+  const label = labels[state.menuCursor];
+  switch (label) {
+    case 'Team':
       state.scene = 'team';
       state.teamCursor = 0;
       showGeorgeTip('team');
       break;
-    case 1: // Skills
+    case 'Live':
+      state.scene = 'live';
+      state.liveBubbles = [];
+      state.liveSpeakers = {};
+      state.liveScroll = 0;
+      state.liveSummary = null;
+      state._liveServerOk = false;
+      state._liveRecentCount = 0;
+      state._liveLexiconCount = 0;
+      // Probe server status
+      fetch(LOCAL_VAULT_URL + '/health').then(r => r.json()).then(() => {
+        state._liveServerOk = true;
+      }).catch(() => { state._liveServerOk = false; });
+      // Fetch recent session count
+      fetch(LOCAL_VAULT_URL + '/documents').then(r => r.json()).then(docs => {
+        state._liveRecentCount = docs.filter(d => d.doc_type === 'note').length;
+      }).catch(() => {});
+      // Fetch lexicon count
+      fetch(LOCAL_VAULT_URL + '/lexicon').then(r => r.json()).then(lex => {
+        state._liveLexiconCount = lex.length;
+      }).catch(() => {});
+      showGeorgeTip('live');
+      break;
+    case 'Skills':
       state.scene = 'skills';
       state.skillsCursor = 0;
       showGeorgeTip('skills');
       break;
-    case 2: // Library
+    case 'Library':
       state.scene = 'content';
       fetchContent();
       showGeorgeTip('content');
       break;
-    case 3: // Vault
+    case 'Log':
+      state.scene = 'log';
+      state.logCursor = 0;
+      state.logBody = null;
+      fetchTranscripts();
+      showGeorgeTip('log');
+      break;
+    case 'Vault':
       state.scene = 'vault';
       state.vaultQuery = '';
       state.vaultResults = null;
       state.vaultLoading = false;
       showGeorgeTip('vault');
       break;
-    case 4: // Message
+    case 'Narada':
+      state.scene = 'narada';
+      state.naradaPrompt = '';
+      state.naradaResults = null;
+      state.naradaLoading = false;
+      state.naradaShowIdx = -1;
+      showGeorgeTip('narada');
+      break;
+    case 'Message':
       state.scene = 'message';
       state.messageText = '';
       state.messageSent = false;
       showGeorgeTip('message');
       break;
-    case 5: // About
+    case 'About':
       state.scene = 'about';
       state.aboutTab = 0;
       state.aboutScroll = 0;
       showGeorgeTip('about');
       break;
-    case 6: // Disconnect
+    case 'Disconnect':
       state.connected = false;
       state.serverUrl = '';
       state.scene = 'title';
@@ -2359,13 +2530,29 @@ function handleUp() {
     case 'about':
       state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
       break;
+    case 'log':
+      if (state.logBody !== null) {
+        state.readingScroll = Math.max(0, state.readingScroll - 20);
+      } else {
+        state.logCursor = Math.max(0, state.logCursor - 1);
+      }
+      break;
+    case 'narada':
+      state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
+      break;
+    case 'live':
+      state.liveScroll = Math.max(0, state.liveScroll - 30);
+      break;
+    case 'live-summary':
+      state.readingScroll = Math.max(0, state.readingScroll - 20);
+      break;
   }
 }
 
 function handleDown() {
   switch (state.scene) {
     case 'menu':
-      state.menuCursor = Math.min((state.menuItems.length || 7) - 1, state.menuCursor + 1);
+      state.menuCursor = Math.min((state.menuItems.length || 9) - 1, state.menuCursor + 1);
       break;
     case 'team':
       state.teamCursor = Math.min(PERSONAS.length - 1, state.teamCursor + 1);
@@ -2381,6 +2568,22 @@ function handleDown() {
       break;
     case 'about':
       state.aboutScroll = Math.min(state._aboutMaxScroll || 0, (state.aboutScroll || 0) + 20);
+      break;
+    case 'log':
+      if (state.logBody !== null) {
+        state.readingScroll = Math.min(state._maxScroll || 0, state.readingScroll + 20);
+      } else {
+        state.logCursor = Math.min(state.logItems.length - 1, state.logCursor + 1);
+      }
+      break;
+    case 'narada':
+      state.aboutScroll = Math.min(state._aboutMaxScroll || 0, (state.aboutScroll || 0) + 20);
+      break;
+    case 'live':
+      state.liveScroll += 30;
+      break;
+    case 'live-summary':
+      state.readingScroll = Math.min(state._maxScroll || 0, state.readingScroll + 20);
       break;
   }
 }
@@ -2412,7 +2615,24 @@ function handleBack() {
     case 'about':
     case 'vault':
     case 'message':
+    case 'narada':
+    case 'live-summary':
       state.scene = 'menu';
+      break;
+    case 'live':
+      if (state.liveActive) {
+        stopLiveSession();
+      } else {
+        state.scene = 'menu';
+      }
+      break;
+    case 'log':
+      if (state.logBody !== null) {
+        state.logBody = null;
+        state.readingScroll = 0;
+      } else {
+        state.scene = 'menu';
+      }
       break;
     case 'reading':
       state.scene = 'content';
@@ -2427,6 +2647,729 @@ function handleBack() {
   }
 }
 
+// ── Log Scene (Quest Log / Transcripts) ──
+
+async function fetchTranscripts() {
+  state.logLoading = true;
+  try {
+    const resp = await fetch(`${LOCAL_VAULT_URL}/transcripts`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    state.logItems = await resp.json();
+  } catch (e) {
+    state.logItems = [];
+  }
+  state.logLoading = false;
+}
+
+async function openTranscript(slug) {
+  state.logLoading = true;
+  try {
+    const resp = await fetch(`${LOCAL_VAULT_URL}/transcript/${slug}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    // Strip frontmatter
+    let body = data.content || '';
+    body = body.replace(/^---\n[\s\S]*?---\n/, '');
+    state.logBody = body;
+    state.readingScroll = 0;
+  } catch (e) {
+    state.logBody = `Error: ${e.message}`;
+  }
+  state.logLoading = false;
+}
+
+function renderLog() {
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Quest Log', 20, 24, COLORS.textHighlight, 11);
+  drawText(`${state.logItems.length} sessions`, BASE_W - 110, 24, COLORS.textDisabled, 8);
+
+  if (state.logBody !== null) {
+    // Reading a transcript
+    const textY = 42;
+    const textH = BASE_H - textY - 36;
+    drawBox(10, textY - 4, BASE_W - 20, textH + 8);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(12, textY, BASE_W - 24, textH);
+    ctx.clip();
+    drawTextWrapped(state.logBody, 24, textY + 14 - state.readingScroll, BASE_W - 52, COLORS.text, 12);
+    ctx.restore();
+    drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+    drawText('\u2191\u2193 Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+    return;
+  }
+
+  if (state.logLoading) {
+    drawText('Loading transcripts...', 24, 60, COLORS.textDisabled);
+    return;
+  }
+
+  if (state.logItems.length === 0) {
+    drawText('No transcripts found.', 24, 60, COLORS.textDisabled);
+    drawText('Record a meeting in mysloodsiewnia first.', 24, 76, COLORS.textDisabled, 8);
+    drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+    drawText('ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+    return;
+  }
+
+  // List
+  const listY = 40;
+  const listH = BASE_H - listY - 36;
+  drawBox(10, listY - 4, BASE_W - 20, listH + 8);
+
+  const visibleCount = Math.floor(listH / 22);
+  let scrollOffset = 0;
+  if (state.logCursor >= visibleCount) {
+    scrollOffset = state.logCursor - visibleCount + 1;
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(12, listY, BASE_W - 24, listH);
+  ctx.clip();
+
+  state.logItems.forEach((t, i) => {
+    if (i < scrollOffset || i >= scrollOffset + visibleCount + 1) return;
+    const iy = listY + 10 + (i - scrollOffset) * 22;
+    const selected = state.logCursor === i;
+    if (selected) {
+      drawCursor(16, iy);
+    }
+    const title = (t.title || t.slug || 'Untitled').slice(0, 35);
+    const date = (t.created_at || '').slice(0, 10);
+    const dur = t.duration || '';
+    drawText(title, 32, iy, selected ? COLORS.textHighlight : COLORS.text, 9);
+    drawText(date, BASE_W - 100, iy, COLORS.textDisabled, 7);
+    if (dur) drawText(dur, BASE_W - 50, iy, COLORS.textDisabled, 7);
+  });
+
+  ctx.restore();
+
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('ENTER Read   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
+function handleLogSelect() {
+  if (state.logBody !== null) return; // already reading
+  const item = state.logItems[state.logCursor];
+  if (item) {
+    playSfx('select');
+    openTranscript(item.slug);
+  }
+}
+
+// ── Narada Scene ──
+
+async function runNarada(prompt) {
+  state.naradaLoading = true;
+  state.naradaResults = null;
+  state.naradaShowIdx = -1;
+  state.aboutScroll = 0;
+
+  try {
+    const resp = await fetch(`${LOCAL_VAULT_URL}/narada`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, max_tokens: 300 }),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    state.naradaResults = data.responses || [];
+    // Stagger display
+    state.naradaShowIdx = 0;
+    for (let i = 1; i < state.naradaResults.length; i++) {
+      setTimeout(() => { state.naradaShowIdx = i; }, i * 800);
+    }
+  } catch (e) {
+    state.naradaResults = [{ id: 'error', name: 'Error', role: '', color: '#ff4444', response: e.message }];
+    state.naradaShowIdx = 0;
+  }
+  state.naradaLoading = false;
+}
+
+function renderNarada() {
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Narada', 20, 24, COLORS.textHighlight, 11);
+
+  const activeCount = PERSONAS.filter(p => p._active !== false).length;
+  drawText(`${activeCount} active`, BASE_W - 90, 24, COLORS.textDisabled, 8);
+
+  // prompt input
+  drawBox(10, 40, BASE_W - 20, 36);
+  drawText('Prompt:', 20, 62, COLORS.dialogBorder, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(72, 50, BASE_W - 100, 18);
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.strokeRect(72, 50, BASE_W - 100, 18);
+  const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '\u2588' : '';
+  const promptDisplay = state.naradaPrompt.length > 45 ? '...' + state.naradaPrompt.slice(-42) : state.naradaPrompt;
+  drawText(promptDisplay + (state.naradaLoading ? '' : cursor), 76, 63, COLORS.text, 9);
+
+  // results area
+  const resultY = 84;
+  const resultH = BASE_H - resultY - 36;
+  drawBox(10, resultY, BASE_W - 20, resultH);
+
+  if (state.naradaLoading) {
+    drawText('Querying team...', 24, resultY + 20, COLORS.textDisabled);
+    const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
+    drawText(dots, 120, resultY + 20, COLORS.textHighlight);
+  } else if (!state.naradaResults) {
+    drawText('Type a question for the team.', 24, resultY + 20, COLORS.textDisabled);
+    drawText('Active personas will brainstorm your topic.', 24, resultY + 36, COLORS.textDisabled, 8);
+    drawText('Example: "Should we split the monolith?"', 24, resultY + 50, COLORS.textDisabled, 8);
+  } else {
+    // Show staggered responses
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(12, resultY + 2, BASE_W - 24, resultH - 4);
+    ctx.clip();
+
+    // Build combined text for all visible responses
+    let combined = '';
+    for (let i = 0; i <= state.naradaShowIdx && i < state.naradaResults.length; i++) {
+      const r = state.naradaResults[i];
+      combined += `[${r.name} \u2014 ${r.role}]\n${r.response || ''}\n\n`;
+    }
+    drawTextWrapped(combined.trim(), 24, resultY + 16 - (state.aboutScroll || 0), BASE_W - 52, COLORS.text, 13);
+
+    ctx.restore();
+  }
+
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('Type prompt   ENTER Send   \u2191\u2193 Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
+function handleNaradaInput(e) {
+  if (e.key === 'Escape') {
+    playSfx('back');
+    state.scene = 'menu';
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    state.aboutScroll = (state.aboutScroll || 0) + 20;
+    return;
+  }
+  if (e.key === 'Enter' && state.naradaPrompt.trim() && !state.naradaLoading) {
+    playSfx('select');
+    runNarada(state.naradaPrompt.trim());
+    return;
+  }
+  if (state.naradaLoading) return;
+  if (e.key === 'Backspace') {
+    state.naradaPrompt = state.naradaPrompt.slice(0, -1);
+    return;
+  }
+  if (e.ctrlKey || e.metaKey) return;
+  if (e.key.length === 1) {
+    state.naradaPrompt = (state.naradaPrompt + e.key).slice(0, 500);
+  }
+}
+
+// ── Persona State Sync ──
+
+async function syncPersonaState() {
+  try {
+    const resp = await fetch(`${LOCAL_VAULT_URL}/personas/state`);
+    if (!resp.ok) return;
+    const liveState = await resp.json();
+    liveState.forEach(ls => {
+      const p = PERSONAS.find(pp => pp.id === ls.id);
+      if (p) {
+        p._active = ls.active;
+        p._liveModel = ls.model;
+        p._liveProvider = ls.provider;
+      }
+    });
+  } catch (e) {
+    // mysloodsiewnia offline — no sync
+  }
+}
+
+// ── Live Transcription Scene ──
+
+const SPEAKER_COLORS = ['#88ccff', '#ff88aa', '#ffaa00', '#44dd88', '#aa88ff', '#ff6644', '#44ccff', '#ffcc44'];
+const CHUNK_INTERVAL = 25000;
+let liveElapsedTimer = null;
+
+function getSpeakerColor(name) {
+  if (state.liveSpeakers[name]) return state.liveSpeakers[name].color;
+  const idx = Object.keys(state.liveSpeakers).length;
+  const color = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
+  state.liveSpeakers[name] = { color, seconds: 0, percent: 0 };
+  // Generate avatar for this speaker
+  generateAvatar(name, 32);
+  return color;
+}
+
+function addBubble(speaker, text, opts = {}) {
+  const isPersona = opts.isPersona || false;
+  const color = isPersona
+    ? (opts.color || '#888')
+    : getSpeakerColor(speaker);
+  state.liveBubbles.push({
+    id: Date.now() + Math.random(),
+    speaker,
+    text: text.slice(0, 400),
+    color,
+    isPersona,
+    time: Date.now(),
+  });
+  // Auto-scroll to bottom
+  state.liveScroll = Math.max(0, state.liveBubbles.length * 70 - 200);
+}
+
+async function startLiveSession() {
+  try {
+    addBubble('System', 'Requesting mic access...', { color: '#88ccff' });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    state.liveStream = stream;
+
+    addBubble('System', 'Connecting to server...', { color: '#88ccff' });
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    state.liveWs = new WebSocket(`${wsProto}//localhost:7331/ws/transcribe`);
+
+    state.liveWs.onerror = (ev) => {
+      addBubble('System', 'WebSocket error — check if myśloodsiewnia is running with SSL', { color: '#ff4444' });
+      stopLiveSession();
+    };
+
+    state.liveWs.onopen = () => {
+      const mt = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(m =>
+        MediaRecorder.isTypeSupported(m)) || '';
+      const opts = { audioBitsPerSecond: 128000 };
+      if (mt) opts.mimeType = mt;
+
+      try {
+        state.liveRecorder = new MediaRecorder(stream, opts);
+      } catch (recErr) {
+        addBubble('System', 'MediaRecorder init failed: ' + recErr.message, { color: '#ff4444' });
+        stopLiveSession();
+        return;
+      }
+
+      const actualMime = state.liveRecorder.mimeType || mt || 'audio/webm';
+      state.liveWs.send(JSON.stringify({ action: 'format', mime: actualMime }));
+      addBubble('System', 'Recording started (' + actualMime.split(';')[0] + ')', { color: '#44dd88' });
+
+      state.liveRecorder.onerror = (ev) => {
+        addBubble('System', 'Recorder error: ' + (ev.error?.message || 'unknown'), { color: '#ff4444' });
+        stopLiveSession();
+      };
+
+      // Stop/start cycle: stop creates complete file with headers
+      let audioChunks = [];
+      state.liveRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      state.liveRecorder.onstop = () => {
+        if (audioChunks.length === 0) return;
+        const blob = new Blob(audioChunks, { type: actualMime });
+        audioChunks = [];
+        if (blob.size > 1000 && state.liveWs && state.liveWs.readyState === 1) {
+          blob.arrayBuffer().then(buf => {
+            if (state.liveWs && state.liveWs.readyState === 1) state.liveWs.send(buf);
+          });
+        }
+        // Restart if still active
+        if (stream.active && state.liveActive) {
+          try { state.liveRecorder.start(); } catch(_) {}
+        }
+      };
+
+      state.liveRecorder.start();
+
+      state._chunkFlushTimer = setInterval(() => {
+        if (state.liveRecorder && state.liveRecorder.state === 'recording') {
+          state.liveRecorder.stop();
+        }
+      }, CHUNK_INTERVAL);
+
+      state.liveActive = true;
+      state.liveStartTime = Date.now();
+      liveElapsedTimer = setInterval(() => {
+        state.liveElapsed = Math.floor((Date.now() - state.liveStartTime) / 1000);
+      }, 500);
+    };
+
+    state.liveWs.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.error) {
+          addBubble('System', d.error, { color: '#ff4444' });
+          return;
+        }
+        if (d.final && d.slug) {
+          if (state._saveTimeout) clearTimeout(state._saveTimeout);
+          state.liveSummary = d;
+          state.scene = 'live-summary';
+          state.readingScroll = 0;
+          // Clean up WebSocket now that save is confirmed
+          if (state.liveWs) {
+            state.liveWs.onclose = null;
+            state.liveWs.close();
+            state.liveWs = null;
+          }
+          return;
+        }
+        if (d.text && !d.silent) {
+          // Parse speakers from transcript text
+          const lines = d.text.split('\n');
+          let currentSpeaker = 'Rozmowa';
+          let currentText = [];
+          for (const line of lines) {
+            const m = line.match(/^\*\*([^*]+)\*\*:\s*(.*)/);
+            const m2 = line.match(/^(SPEAKER_\d+):\s*(.*)/);
+            if (m || m2) {
+              if (currentText.length > 0) {
+                addBubble(currentSpeaker, currentText.join(' ').trim());
+              }
+              currentSpeaker = (m ? m[1] : m2[1]).trim();
+              currentText = [(m ? m[2] : m2[2]) || ''];
+            } else if (line.trim()) {
+              currentText.push(line.trim());
+            }
+          }
+          if (currentText.length > 0 && currentText.join(' ').trim()) {
+            addBubble(currentSpeaker, currentText.join(' ').trim());
+          }
+        }
+        if (d.persona && d.response) {
+          const p = PERSONAS.find(pp => pp.id === d.persona);
+          addBubble(d.persona_name || d.persona, d.response, {
+            isPersona: true,
+            color: d.persona_color || (p ? p.color : '#888'),
+          });
+          playSfx('typewriter');
+        }
+        if (d.speaker_stats) {
+          for (const [name, data] of Object.entries(d.speaker_stats)) {
+            if (!state.liveSpeakers[name]) getSpeakerColor(name);
+            state.liveSpeakers[name].seconds = data.seconds || 0;
+            state.liveSpeakers[name].percent = data.percent || 0;
+          }
+        }
+        if (d.face_analysis) {
+          state.liveMood = d.face_analysis;
+          state.liveMoodTime = Date.now();
+        }
+      } catch (parseErr) {
+        console.warn('Live WS parse error:', parseErr);
+      }
+    };
+
+    state.liveWs.onclose = (ev) => {
+      if (state.liveActive) {
+        addBubble('System', 'Connection closed' + (ev.code !== 1000 ? ' (code ' + ev.code + ')' : ''), { color: '#ffcc44' });
+        stopLiveSession();
+      }
+    };
+  } catch (e) {
+    addBubble('System', 'Mic error: ' + e.message, { color: '#ff4444' });
+  }
+}
+
+function stopLiveSession() {
+  clearInterval(liveElapsedTimer);
+  clearInterval(state._chunkFlushTimer);
+  liveElapsedTimer = null;
+  if (state.liveRecorder) {
+    state.liveRecorder.ondataavailable = null;
+    state.liveRecorder.onerror = null;
+    if (state.liveRecorder.state === 'recording') {
+      try { state.liveRecorder.stop(); } catch (_) {}
+    }
+  }
+  if (state.liveStream) {
+    state.liveStream.getTracks().forEach(t => t.stop());
+    state.liveStream = null;
+  }
+  if (state.liveWs) {
+    state.liveWs.onerror = null;
+    state.liveWs.onclose = null;
+    if (state.liveWs.readyState <= 1) {
+      state.liveWs.close();
+    }
+  }
+  state.liveActive = false;
+  state.liveRecorder = null;
+  state.liveWs = null;
+}
+
+function saveLiveSession() {
+  if (!state.liveWs || state.liveWs.readyState !== 1) return;
+  clearInterval(liveElapsedTimer);
+  // Stop recording but keep WebSocket alive for server response
+  if (state.liveRecorder) {
+    state.liveRecorder.ondataavailable = null;
+    state.liveRecorder.onerror = null;
+    if (state.liveRecorder.state === 'recording') {
+      try { state.liveRecorder.stop(); } catch (_) {}
+    }
+    state.liveRecorder = null;
+  }
+  if (state.liveStream) {
+    state.liveStream.getTracks().forEach(t => t.stop());
+    state.liveStream = null;
+  }
+  state.liveActive = false;
+  addBubble('System', 'Saving session...', { color: '#88ccff' });
+  // Send save — keep WS open so onmessage can receive {final: true}
+  // onmessage handler will set scene to 'live-summary' when it gets the response
+  // Timeout: if no response in 10s, show error
+  const ws = state.liveWs;
+  const saveTimeout = setTimeout(() => {
+    if (state.scene !== 'live-summary') {
+      addBubble('System', 'Save timeout — server did not confirm', { color: '#ff4444' });
+      if (ws && ws.readyState <= 1) ws.close();
+      state.liveWs = null;
+    }
+  }, 10000);
+  state._saveTimeout = saveTimeout;
+  ws.send(JSON.stringify({ action: 'save', title: '', participants: '' }));
+}
+
+function fmtElapsed(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function renderLive() {
+  // ── Header bar ──
+  drawBox(10, 8, BASE_W - 20, 24);
+  if (state.liveActive) {
+    // Recording indicator — pulsing dot
+    const pulse = Math.floor(Date.now() / 600) % 2 === 0;
+    if (pulse) {
+      ctx.fillStyle = '#ff4444';
+      ctx.beginPath();
+      ctx.arc(22, 22, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    drawText('REC', 30, 24, '#ff4444', 10);
+    drawText(fmtElapsed(state.liveElapsed), 60, 24, COLORS.text, 10);
+  } else {
+    drawText('Live', 20, 24, COLORS.textHighlight, 11);
+  }
+  drawText(`${state.liveBubbles.length} chunks`, BASE_W - 100, 24, COLORS.textDisabled, 8);
+
+  // ── Mood badge ──
+  if (state.liveMood && (Date.now() - state.liveMoodTime < 60000)) {
+    const m = state.liveMood;
+    drawText(m.icon || '', BASE_W - 36, 24, m.color || '#888', 12);
+  }
+
+  // ── Speaker stats bar (top-right) ──
+  const speakers = Object.entries(state.liveSpeakers);
+  if (speakers.length > 0) {
+    const barY = 8;
+    const barX = 130;
+    const barW = BASE_W - barX - 110;
+    // Stacked bar
+    let bx = barX;
+    speakers.forEach(([name, data]) => {
+      const w = Math.max(2, Math.floor(barW * data.percent / 100));
+      ctx.fillStyle = data.color;
+      ctx.fillRect(bx, barY + 2, w, 6);
+      bx += w;
+    });
+    ctx.strokeStyle = COLORS.dialogBorderInner;
+    ctx.strokeRect(barX, barY + 2, barW, 6);
+  }
+
+  // ── Speaker roster (left sidebar) ──
+  const sideW = 80;
+  const sideY = 40;
+  const sideH = BASE_H - sideY - 36;
+  drawBox(10, sideY, sideW, sideH);
+
+  drawText('WHO', 18, sideY + 14, COLORS.textDisabled, 7);
+  let sy = sideY + 24;
+  if (speakers.length > 0) {
+    speakers.slice(0, 8).forEach(([name, data]) => {
+      drawFace(name, 16, sy - 4, 20, true);
+      const shortName = name.length > 7 ? name.slice(0, 6) + '.' : name;
+      drawText(shortName, 40, sy + 6, data.color, 7);
+      drawText(`${data.percent}%`, 40, sy + 14, COLORS.textDisabled, 6);
+      sy += 26;
+    });
+  } else {
+    // Show active personas when idle
+    PERSONAS.filter(p => p.active !== false).slice(0, 6).forEach(p => {
+      drawFace(p.id, 16, sy - 4, 20, true);
+      const shortName = p.name.split(' ')[0];
+      const sn = shortName.length > 7 ? shortName.slice(0, 6) + '.' : shortName;
+      drawText(sn, 40, sy + 6, p.color, 7);
+      sy += 22;
+    });
+  }
+
+  // ── Bubble area (main panel) ──
+  const bubbleX = sideW + 18;
+  const bubbleY = 40;
+  const bubbleW = BASE_W - bubbleX - 10;
+  const bubbleH = sideH;
+  drawBox(bubbleX - 4, bubbleY, bubbleW + 8, bubbleH);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bubbleX - 2, bubbleY + 2, bubbleW + 4, bubbleH - 4);
+  ctx.clip();
+
+  // ── Idle screen: show server info + active personas ──
+  if (!state.liveActive && state.liveBubbles.length === 0) {
+    let iy = bubbleY + 16;
+
+    // Server status
+    const srvOk = state._liveServerOk;
+    const dot = srvOk ? '\u25CF' : '\u25CB';
+    const dotCol = srvOk ? '#44dd88' : '#ff4444';
+    drawText(dot, bubbleX + 4, iy, dotCol, 10);
+    drawText(srvOk ? 'my\u015Bloodsiewnia online' : 'server offline', bubbleX + 16, iy, srvOk ? COLORS.text : '#ff4444', 9);
+    iy += 16;
+
+    // Recent sessions count
+    if (state._liveRecentCount > 0) {
+      drawText(`${state._liveRecentCount} saved sessions`, bubbleX + 4, iy, COLORS.textDisabled, 8);
+      iy += 12;
+    }
+
+    // Lexicon count
+    if (state._liveLexiconCount > 0) {
+      drawText(`${state._liveLexiconCount} terms in lexicon`, bubbleX + 4, iy, COLORS.textDisabled, 8);
+      iy += 12;
+    }
+
+    iy += 8;
+
+    // Active personas that will participate
+    const activeP = PERSONAS.filter(p => p.active !== false);
+    if (activeP.length > 0) {
+      drawText('ACTIVE TEAM', bubbleX + 4, iy, COLORS.textDisabled, 7);
+      iy += 14;
+      activeP.slice(0, 6).forEach(p => {
+        drawFace(p.id, bubbleX + 4, iy - 4, 20, true);
+        drawText(p.name, bubbleX + 28, iy + 4, p.color, 8);
+        drawText(p.role, bubbleX + 28, iy + 14, COLORS.textDisabled, 7);
+        iy += 26;
+      });
+    }
+
+    iy += 10;
+    drawText('Press ENTER to start recording', bubbleX + 4, iy, COLORS.textDisabled, 8);
+    iy += 12;
+    drawText('Audio \u2192 Whisper \u2192 AI team analysis', bubbleX + 4, iy, COLORS.textDisabled, 7);
+  }
+
+  // Render bubbles
+  const maxBubbleScroll = Math.max(0, state.liveBubbles.length * 58 - bubbleH + 20);
+  if (state.liveScroll > maxBubbleScroll) state.liveScroll = maxBubbleScroll;
+
+  let by = bubbleY + 10 - state.liveScroll;
+  state.liveBubbles.forEach((b) => {
+    if (by > bubbleY + bubbleH + 10 || by + 50 < bubbleY) { by += 58; return; }
+
+    if (b.isPersona) {
+      // Persona bubble — left-aligned with portrait + color accent
+      const pId = PERSONAS.find(p => p.name === b.speaker || p.id === b.speaker)?.id || b.speaker;
+      drawFace(pId, bubbleX, by, 24, true);
+      // Name
+      drawText(b.speaker, bubbleX + 28, by + 8, b.color, 8);
+      // Bubble body
+      ctx.fillStyle = b.color + '18';
+      const bubH = 36;
+      ctx.beginPath();
+      roundRect(ctx, bubbleX + 28, by + 12, bubbleW - 34, bubH, 3);
+      ctx.fill();
+      ctx.strokeStyle = b.color + '44';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      roundRect(ctx, bubbleX + 28, by + 12, bubbleW - 34, bubH, 3);
+      ctx.stroke();
+      // Text
+      drawTextWrapped(b.text, bubbleX + 32, by + 24, bubbleW - 44, COLORS.text, 11);
+    } else {
+      // Speaker bubble — right-aligned feel
+      drawFace(b.speaker, bubbleX, by, 20, true);
+      drawText(b.speaker, bubbleX + 24, by + 8, b.color, 8);
+      // Text body
+      drawTextWrapped(b.text, bubbleX + 24, by + 20, bubbleW - 30, COLORS.dialogBorder, 11);
+    }
+    by += 58;
+  });
+
+  ctx.restore();
+
+  // ── Bottom bar ──
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  if (state.liveActive) {
+    drawText('ENTER Save   \u2191\u2193 Scroll   ESC Stop', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  } else if (state.liveBubbles.length > 0) {
+    drawText('\u2191\u2193 Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  } else {
+    drawText('ENTER Start recording   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  }
+}
+
+// ── Live Summary Scene ──
+
+function renderLiveSummary() {
+  drawBox(10, 8, BASE_W - 20, 24);
+  drawText('Session Saved', 20, 24, COLORS.hpGreen, 11);
+
+  const s = state.liveSummary;
+  if (!s) { drawText('No data', 24, 60, COLORS.textDisabled); return; }
+
+  const bodyY = 42;
+  const bodyH = BASE_H - bodyY - 36;
+  drawBox(10, bodyY - 4, BASE_W - 20, bodyH + 8);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(12, bodyY, BASE_W - 24, bodyH);
+  ctx.clip();
+
+  let ty = bodyY + 14 - state.readingScroll;
+  drawText(s.title || s.slug || 'Untitled', 24, ty, COLORS.textHighlight, 11);
+  ty += 18;
+  drawText(`${s.chunks || '?'} chunks`, 24, ty, COLORS.textDisabled, 9);
+  ty += 16;
+
+  // Speaker summary
+  const speakers = Object.entries(state.liveSpeakers);
+  if (speakers.length > 0) {
+    drawText('SPEAKERS', 24, ty, COLORS.textDisabled, 7);
+    ty += 12;
+    speakers.forEach(([name, data]) => {
+      drawFace(name, 24, ty - 4, 16, true);
+      drawText(`${name}`, 44, ty + 4, data.color, 8);
+      drawText(`${data.percent}%`, 140, ty + 4, COLORS.textDisabled, 8);
+      ty += 18;
+    });
+    ty += 8;
+  }
+
+  if (s.summary) {
+    drawText('SUMMARY', 24, ty, COLORS.textDisabled, 7);
+    ty += 14;
+    ty = drawTextWrapped(s.summary, 24, ty, BASE_W - 52, COLORS.text, 13);
+  }
+
+  ctx.restore();
+
+  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
+  drawText('\u2191\u2193 Scroll   ESC Back to menu', 20, BASE_H - 14, COLORS.textDisabled, 8);
+}
+
 // ── Start ──
 
 init();
+syncPersonaState();
