@@ -2629,13 +2629,13 @@ const AGENT_GUIDE = [
   { cmd: 'list_content', hint: 'Browse poems, essays, notes', prompt: '"Show me what kapoost wrote"' },
   { cmd: 'read_content {slug}', hint: 'Read a piece in full', prompt: '"Read the poem Suma czlowieczenstwa"' },
   { cmd: 'verify_content {slug}', hint: 'Check Ed25519 signature', prompt: '"Verify this poem is authentic"' },
-  { cmd: 'list_personas', hint: 'See the team roster', prompt: '"Who is on kapoost\'s team?"' },
-  { cmd: 'bootstrap_session', hint: 'Unlock full context (code needed)', prompt: '"Bootstrap session, code: <code>"' },
-  { cmd: 'list_skills', hint: 'Browse skill catalog', prompt: '"What skills does kapoost have?"' },
-  { cmd: 'query_vault', hint: 'Search kapoost\'s memory/RAG', prompt: '"Search vault for sailing notes"' },
+  { cmd: 'list_personas', hint: 'See 14-persona AI team', prompt: '"Who is on kapoost\'s team?"' },
+  { cmd: 'bootstrap_session', hint: 'Unlock full prompts + skills', prompt: '"Bootstrap session, code: <code>"' },
+  { cmd: 'list_skills', hint: 'Browse 18 skill instructions', prompt: '"What skills does kapoost have?"' },
+  { cmd: 'query_vault', hint: 'Search knowledge base (my\u015bloodsiewnia)', prompt: '"Search vault for sailing notes"' },
   { cmd: 'leave_comment {slug}', hint: 'React to a piece', prompt: '"Tell kapoost I liked his poem"' },
   { cmd: 'leave_message', hint: 'Send a note to kapoost', prompt: '"Send kapoost a message"' },
-  { cmd: 'get_certificate {slug}', hint: 'Bitcoin timestamp proof', prompt: '"Show the timestamp proof"' },
+  { cmd: 'get_certificate {slug}', hint: 'IP cert + originality score', prompt: '"Show the timestamp proof"' },
   { cmd: 'request_access {slug}', hint: 'Unlock gated content', prompt: '"How do I unlock private contact?"' },
 ];
 
@@ -2747,7 +2747,7 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
 
   drawText('How to talk to a humanMCP server', cardX + 14, y, COLORS.textHighlight, 10);
   y += 6;
-  drawTextWrapped('Connect your agent (Claude Code, Claude Desktop, or any MCP client) to the server URL. Then use natural language — the agent will call the right tools.', cardX + 14, y + 8, cardW - 32, COLORS.textDisabled, 11);
+  drawTextWrapped('Connect your agent (Claude Code, Claude Desktop, or any MCP client) to the server URL. Or open this RPG client on GitHub Pages — no install needed, direct JSON-RPC.', cardX + 14, y + 8, cardW - 32, COLORS.textDisabled, 11);
   y += 48;
 
   // separator
@@ -2782,7 +2782,7 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
   drawText('Quick start:', cardX + 14, y, COLORS.textHighlight, 9);
   y += 14;
   const steps = [
-    '1. Connect agent to MCP URL',
+    '1. Connect agent to MCP URL (or open GitHub Pages)',
     '2. "Tell me about kapoost"',
     '3. "Show me his poems"',
     '4. "Read Suma czlowieczenstwa"',
@@ -2792,6 +2792,26 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
     drawText(step, cardX + 14, y + i * 13, i === 4 ? COLORS.dialogBorder : COLORS.text, 9);
   });
   y += steps.length * 13 + 10;
+
+  // myśloodsiewnia integration section
+  ctx.strokeStyle = COLORS.dialogBorderInner;
+  ctx.beginPath(); ctx.moveTo(cardX + 12, y); ctx.lineTo(cardX + cardW - 16, y); ctx.stroke();
+  y += 12;
+
+  drawText('my\u015bloodsiewnia integration', cardX + 14, y, COLORS.textHighlight, 9);
+  y += 14;
+  drawTextWrapped('When running locally with my\u015bloodsiewnia (vault server), you get additional features: Live transcription with Whisper + persona commentary, Quest Log with meeting briefs, Narada team brainstorms via Ollama, local vault search with embeddings, and progression sync.', cardX + 14, y, cardW - 32, COLORS.textDisabled, 9);
+  y += 52;
+
+  const modes = [
+    { label: 'GitHub Pages', desc: 'Team, Skills, Library, Vault, Message, Settings', color: '#44dd88' },
+    { label: '+ my\u015bloodsiewnia', desc: '+ Live, Quest Log, Narada, local vault, progression sync', color: '#ffcc44' },
+  ];
+  modes.forEach((m, i) => {
+    drawText(m.label, cardX + 14, y + i * 14, m.color, 8);
+    drawText(m.desc, cardX + 120, y + i * 14, COLORS.textDisabled, 7);
+  });
+  y += modes.length * 14 + 10;
 
   state._aboutMaxScroll = Math.max(0, y + scroll - cardY - areaH + 10);
   ctx.restore();

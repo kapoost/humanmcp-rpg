@@ -3,6 +3,8 @@
 A jRPG-styled client for [humanMCP](https://github.com/kapoost/humanmcp-go) servers.
 Explore any human's published content, personas, and skills through a retro FF7-inspired interface — all rendered on Canvas 2D with vanilla JS.
 
+**Play now:** [kapoost.github.io/humanmcp-rpg](https://kapoost.github.io/humanmcp-rpg) — no install needed, connects directly to the MCP server.
+
 ![humanMCP RPG](https://img.shields.io/badge/stack-vanilla%20JS%20%2B%20Canvas-black?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
@@ -10,12 +12,19 @@ Explore any human's published content, personas, and skills through a retro FF7-
 
 Every [humanMCP](https://github.com/kapoost/humanmcp-go) server represents one human — their writings, skills, AI personas, and professional profile. This client turns that data into an explorable RPG world:
 
-- **Team Roster** — browse the human's AI persona team with stats, roles, and pixel art portraits
-- **Skills** — view skill categories and details
+- **Team Roster** — browse the human's 14-persona AI team with stats, roles, and pixel art portraits
+- **Skills** — view 18 skill instructions and categories
 - **Library** — read published poems, essays, and articles with inline images
-- **Vault** — query the human's knowledge base
+- **Vault** — query the human's knowledge base (humanMCP + myśloodsiewnia)
 - **Message** — leave a note for the human
+- **Settings** — configure server URL, session code, API key (persisted in localStorage)
 - **About** — author profile + agent integration guide with example prompts
+- **Console Log** — live activity feed showing MCP calls, connections, and events
+
+With [myśloodsiewnia](https://github.com/kapoost/mysloodsiewnia) running locally:
+- **Live Transcription** — record meetings with Whisper, persona commentary, mood analysis
+- **Quest Log** — browse past meeting transcripts with AI-generated briefs
+- **Narada** — team brainstorm sessions using all 14 personas via local Ollama
 
 ## Quick Start
 
@@ -196,8 +205,10 @@ These features require mysloodsiewnia running on `localhost:7331` with Ollama on
 
 ## Related
 
-- [humanmcp-go](https://github.com/kapoost/humanmcp-go) — the humanMCP server
+- [humanmcp-go](https://github.com/kapoost/humanmcp-go) — the humanMCP server (Go, zero deps, Fly.io)
+- [myśloodsiewnia](https://github.com/kapoost/mysloodsiewnia) — local knowledge base, Whisper transcription, Ollama embeddings
 - [humanmcp-connect](https://github.com/kapoost/humanmcp-connect) — one-line installer for Claude Desktop / Cursor
+- [MCP Registry](https://registry.modelcontextprotocol.io/?search=kapoost) — `io.github.kapoost/humanmcp`
 
 ## License
 
