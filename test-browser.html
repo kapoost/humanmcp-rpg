@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>humanMCP RPG — Browser Tests</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a1a;
+      color: #cccccc;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    #output {
+      white-space: pre-wrap;
+      line-height: 1.5;
+      color: #66ff66;
+    }
+    canvas { display: none; }
+    #touch-controls { display: none !important; }
+  </style>
+</head>
+<body>
+  <!-- DOM elements engine.js expects -->
+  <canvas id="game" width="960" height="640"></canvas>
+  <div id="touch-controls">
+    <div class="dpad">
+      <div class="touch-btn up" data-key="ArrowUp"></div>
+      <div class="touch-btn down" data-key="ArrowDown"></div>
+      <div class="touch-btn left" data-key="ArrowLeft"></div>
+      <div class="touch-btn right" data-key="ArrowRight"></div>
+    </div>
+    <div class="action-btns">
+      <div class="touch-btn btn-a" data-key="Enter"></div>
+      <div class="touch-btn btn-b" data-key="Escape"></div>
+    </div>
+    <div class="btn-tab" data-key="Tab"></div>
+  </div>
+  <input id="mobile-input" type="text">
+
+  <!-- Test output -->
+  <pre id="output"></pre>
+
+  <!-- Load order: mocks → engine → tests -->
+  <script src="test-mocks.js"></script>
+  <script src="engine.js"></script>
+  <script src="test-browser.js"></script>
+</body>
+</html>
