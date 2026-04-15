@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MIC2">
+<meta name="theme-color" content="#0a0a2a">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a2a' width='100' height='100' rx='20'/><text x='50' y='62' text-anchor='middle' fill='%234488ff' font-size='28' font-family='monospace'>MIC2</text></svg>">
+<link rel="manifest" href="mic2-manifest.json">
+<title>MIC2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2a;color:#fff;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;gap:14px;padding:20px;padding-top:env(safe-area-inset-top,20px)}
+.title{font-size:28px;letter-spacing:6px;color:#4488ff}
+.status{font-size:14px;color:#888;text-align:center;line-height:1.6}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.dot.on{background:#44dd88}
+.dot.off{background:#ff4444}
+.dot.wait{background:#ffaa00;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn{background:#1a1a4a;color:#fff;border:2px solid #4488ff;padding:24px 60px;font-size:22px;font-family:inherit;border-radius:12px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;transition:all .15s}
+.btn:active{background:#2a2a6a;transform:scale(0.96)}
+.btn.recording{border-color:#ff4444;color:#ff4444;animation:recpulse 2s infinite;box-shadow:0 0 30px #ff444433}
+@keyframes recpulse{0%,100%{border-color:#ff4444}50%{border-color:#ff444466}}
+.btn:disabled{opacity:.3;border-color:#333}
+.info{font-size:12px;color:#666;text-align:center;max-width:280px;line-height:1.5}
+.info.ok{color:#44dd88}
+.info.err{color:#ff4444}
+.info.warn{color:#ffaa00}
+#viz{width:260px;height:50px;border:1px solid #222;border-radius:6px}
+.debug{font-size:9px;color:#333;text-align:center;margin-top:4px}
+.timer{font-size:36px;font-weight:bold;color:#ff4444;font-variant-numeric:tabular-nums;letter-spacing:2px;display:none}
+.timer.on{display:block}
+.conn-row{display:flex;gap:16px;font-size:11px;color:#444}
+.conn-item{display:flex;align-items:center;gap:4px}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:#333}
+.conn-dot.on{background:#44dd88}
+.conn-dot.off{background:#ff4444}
+.lie-alert{display:none;width:calc(100% - 40px);max-width:340px;background:#1a0a0a;border:2px solid #ff4444;border-radius:10px;padding:16px;margin-top:4px;animation:alertIn .3s ease-out}
+.lie-alert.show{display:block}
+.lie-alert.high{border-color:#ff2222;box-shadow:0 0 30px #ff222244}
+.lie-alert.medium{border-color:#ffaa00;box-shadow:0 0 20px #ffaa0033}
+.lie-alert.low{border-color:#ff666688}
+@keyframes alertIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.lie-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.lie-icon{font-size:20px}
+.lie-severity{font-size:10px;text-transform:uppercase;padding:2px 6px;border-radius:3px;font-weight:bold}
+.lie-severity.high{background:#ff2222;color:#fff}
+.lie-severity.medium{background:#ffaa00;color:#000}
+.lie-severity.low{background:#666;color:#fff}
+.lie-speaker{font-size:13px;color:#ff8888;font-weight:bold}
+.lie-claim{font-size:12px;color:#ffcccc;margin:6px 0;line-height:1.4;border-left:2px solid #ff444466;padding-left:8px}
+.lie-vs{font-size:10px;color:#ff444488;margin:4px 0}
+.lie-contradiction{font-size:12px;color:#ffaaaa;margin:4px 0;line-height:1.4;border-left:2px solid #ffaa0066;padding-left:8px}
+.lie-reasoning{font-size:11px;color:#888;margin-top:8px;line-height:1.4;font-style:italic}
+.lie-dismiss{font-size:10px;color:#444;text-align:center;margin-top:8px;cursor:pointer}
+.lie-count{font-size:11px;color:#ff4444;display:none}
+.lie-count.show{display:block}
+</style>
+</head>
+<body>
+<div class="title">MIC2</div>
+
+<div class="conn-row">
+  <div class="conn-item"><span class="conn-dot" id="cdVault"></span>VAULT</div>
+  <div class="conn-item"><span class="conn-dot" id="cdWs"></span>WS</div>
+  <div class="conn-item"><span class="conn-dot" id="cdRelay"></span>RELAY</div>
+</div>
+
+<div class="status" id="status"><span class="dot wait"></span>Laczenie...</div>
+<div class="info" id="error"></div>
+
+<div class="timer" id="timer">00:00</div>
+
+<div class="lie-alert" id="lieAlert">
+  <div class="lie-header">
+    <span class="lie-icon">⚠</span>
+    <span class="lie-speaker" id="lieSpeaker"></span>
+    <span class="lie-severity" id="lieSeverity"></span>
+  </div>
+  <div class="lie-claim" id="lieClaim"></div>
+  <div class="lie-vs">↕ sprzeczne z:</div>
+  <div class="lie-contradiction" id="lieContra"></div>
+  <div class="lie-reasoning" id="lieReason"></div>
+  <div class="lie-dismiss" id="lieDismiss">tap aby zamknac</div>
+</div>
+
+<div class="lie-count" id="lieCount">0 niespojnosci</div>
+
+<button class="btn" id="btn" disabled>START MIC</button>
+<canvas id="viz" width="260" height="50"></canvas>
+<div class="info" id="info"></div>
+<div class="debug" id="debug"></div>
+
+<script>
+// ── Config ──
+var VAULT_HOST = location.hostname || 'localhost';
+var VAULT_HTTP = location.protocol + '//' + VAULT_HOST + ':7331';
+var VAULT_WS = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + VAULT_HOST + ':7331/ws/phone-mic';
+
+var ws = null;
+var recorder = null;
+var stream = null;
+var recording = false;
+var analyser = null;
+var animFrame = null;
+var actx = null;
+var silentAudio = null; // keeps iOS alive in background
+var startTime = 0;
+var wsAvailable = false; // can we use WebSocket?
+var vaultOk = false;
+var lieCount = 0;
+var lastLieIdx = -1;
+
+var btn = document.getElementById('btn');
+var lieAlert = document.getElementById('lieAlert');
+var lieSpeaker = document.getElementById('lieSpeaker');
+var lieSeverity = document.getElementById('lieSeverity');
+var lieClaim = document.getElementById('lieClaim');
+var lieContra = document.getElementById('lieContra');
+var lieReason = document.getElementById('lieReason');
+var lieDismiss = document.getElementById('lieDismiss');
+var lieCountEl = document.getElementById('lieCount');
+var statusEl = document.getElementById('status');
+var errorEl = document.getElementById('error');
+var infoEl = document.getElementById('info');
+var debugEl = document.getElementById('debug');
+var timerEl = document.getElementById('timer');
+var vizCanvas = document.getElementById('viz');
+var vizCtx = vizCanvas.getContext('2d');
+var cdVault = document.getElementById('cdVault');
+var cdWs = document.getElementById('cdWs');
+var cdRelay = document.getElementById('cdRelay');
+
+function log(msg) {
+  debugEl.textContent = msg;
+}
+
+function setStatus(html) {
+  statusEl.innerHTML = html;
+}
+
+function setInfo(msg, cls) {
+  infoEl.textContent = msg;
+  infoEl.className = 'info' + (cls ? ' ' + cls : '');
+}
+
+function setError(msg) {
+  errorEl.textContent = msg;
+  errorEl.className = 'info err';
+}
+function clearError() {
+  errorEl.textContent = '';
+}
+
+// ── Timer ──
+function updateTimer() {
+  if (!recording) return;
+  var elapsed = Math.floor((Date.now() - startTime) / 1000);
+  var m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  var s = String(elapsed % 60).padStart(2, '0');
+  timerEl.textContent = m + ':' + s;
+}
+
+// ── Vault health check (HTTP — always works) ──
+function checkVault() {
+  fetch(VAULT_HTTP + '/health', { signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      vaultOk = true;
+      cdVault.className = 'conn-dot on';
+      if (!wsAvailable) {
+        btn.disabled = false;
+        setStatus('<span class="dot on"></span>Vault OK (HTTP)');
+      }
+    })
+    .catch(function() {
+      vaultOk = false;
+      cdVault.className = 'conn-dot off';
+      setError('Vault niedostepny: ' + VAULT_HOST + ':7331');
+    });
+}
+
+// ── WebSocket connection (preferred, may fail on iOS) ──
+function connectWs() {
+  try {
+    ws = new WebSocket(VAULT_WS);
+  } catch (e) {
+    log('WS not available: ' + e.message);
+    wsAvailable = false;
+    cdWs.className = 'conn-dot off';
+    return;
+  }
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = function() {
+    wsAvailable = true;
+    cdWs.className = 'conn-dot on';
+    setStatus('<span class="dot on"></span>Polaczono (WS)');
+    btn.disabled = false;
+    clearError();
+    log('WS connected');
+  };
+  ws.onclose = function() {
+    wsAvailable = false;
+    cdWs.className = 'conn-dot off';
+    if (!recording) {
+      setTimeout(connectWs, 5000);
+    }
+  };
+  ws.onerror = function() {
+    wsAvailable = false;
+    cdWs.className = 'conn-dot off';
+    log('WS failed — using HTTP fallback');
+  };
+  ws.onmessage = function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      if (d.relay !== undefined) {
+        cdRelay.className = d.relay ? 'conn-dot on' : 'conn-dot off';
+        if (d.relay) {
+          setInfo('Sesja aktywna — audio przekazywane', 'ok');
+        }
+      }
+      if (d.lie_detector) {
+        showLieAlert(d);
+      }
+    } catch (ex) {}
+  };
+}
+
+// ── Send audio chunk ──
+function sendChunk(buf) {
+  // Prefer WebSocket, fall back to HTTP POST
+  if (ws && ws.readyState === 1) {
+    ws.send(buf);
+    log('WS: ' + buf.byteLength + 'B');
+    return;
+  }
+  // HTTP fallback — POST raw audio to vault
+  fetch(VAULT_HTTP + '/phone-audio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: buf,
+  }).then(function(r) {
+    cdRelay.className = r.ok ? 'conn-dot on' : 'conn-dot off';
+    log('HTTP: ' + buf.byteLength + 'B → ' + r.status);
+  }).catch(function(e) {
+    cdRelay.className = 'conn-dot off';
+    log('HTTP send failed');
+  });
+}
+
+// ── Silent audio trick — keeps iOS alive when screen locks ──
+function startSilentAudio() {
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!actx) actx = new AC();
+    if (actx.state === 'suspended') actx.resume();
+    // Create a silent oscillator to keep audio session alive
+    var osc = actx.createOscillator();
+    var gain = actx.createGain();
+    gain.gain.value = 0.001; // nearly silent
+    osc.connect(gain);
+    gain.connect(actx.destination);
+    osc.start();
+    silentAudio = { osc: osc, gain: gain };
+    // Also set media session metadata for lock screen
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'MIC2 Recording',
+        artist: 'mysloodsiewnia',
+        album: 'Live Session',
+      });
+      navigator.mediaSession.playbackState = 'playing';
+    }
+  } catch (e) {
+    log('silent audio: ' + e.message);
+  }
+}
+
+function stopSilentAudio() {
+  if (silentAudio) {
+    try { silentAudio.osc.stop(); } catch (e) {}
+    silentAudio = null;
+  }
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = 'paused';
+  }
+}
+
+// ── Recording ──
+btn.addEventListener('click', function() {
+  if (recording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+});
+
+function startRecording() {
+  clearError();
+  if (typeof MediaRecorder === 'undefined') {
+    setError('MediaRecorder niedostepny. iOS 14.6+ wymagany.');
+    return;
+  }
+
+  navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  }).then(function(s) {
+    stream = s;
+
+    // Start silent audio to keep iOS alive
+    startSilentAudio();
+
+    // Visualizer
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!actx) actx = new AC();
+      if (actx.state === 'suspended') actx.resume();
+      var src = actx.createMediaStreamSource(stream);
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 128;
+      src.connect(analyser);
+      drawViz();
+    } catch (ve) {
+      log('viz: ' + ve.message);
+    }
+
+    // Find supported mime type — iOS: mp4 first
+    var mimes = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/aac'];
+    var mt = '';
+    for (var i = 0; i < mimes.length; i++) {
+      if (MediaRecorder.isTypeSupported(mimes[i])) { mt = mimes[i]; break; }
+    }
+    log('mime: ' + (mt || 'default'));
+
+    var opts = { audioBitsPerSecond: 64000 };
+    if (mt) opts.mimeType = mt;
+
+    try {
+      recorder = new MediaRecorder(stream, opts);
+    } catch (re) {
+      recorder = new MediaRecorder(stream);
+    }
+
+    var chunks = [];
+    var flushPending = false;
+
+    recorder.ondataavailable = function(e) {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+      if (flushPending && chunks.length > 0) {
+        flushPending = false;
+        var blob = new Blob(chunks, { type: recorder.mimeType || 'audio/mp4' });
+        chunks = [];
+        if (blob.size > 500) {
+          blob.arrayBuffer().then(function(buf) { sendChunk(buf); });
+        }
+      }
+    };
+
+    recorder.onerror = function(ev) {
+      setError('Recorder: ' + (ev.error ? ev.error.message : 'error'));
+      stopRecording();
+    };
+
+    try { recorder.start(1000); } catch (se) { recorder.start(); }
+
+    recording = true;
+    startTime = Date.now();
+    btn.textContent = 'STOP';
+    btn.className = 'btn recording';
+    timerEl.className = 'timer on';
+    setInfo('Nagrywam...', 'warn');
+
+    // Timer update
+    window._timerInt = setInterval(updateTimer, 500);
+
+    // Flush audio every 15s
+    window._flushTimer = setInterval(function() {
+      if (recorder && recorder.state === 'recording') {
+        flushPending = true;
+        try { recorder.requestData(); } catch (rd) {}
+      }
+    }, 15000);
+
+    // iOS timeslice fallback — requestData every 1s
+    window._dataTimer = setInterval(function() {
+      if (recorder && recorder.state === 'recording') {
+        try { recorder.requestData(); } catch (rd) {}
+      }
+    }, 1000);
+
+    // Prevent sleep — request wake lock if available
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(function(lock) {
+        window._wakeLock = lock;
+        log('wake lock active');
+      }).catch(function() {});
+    }
+
+  }).catch(function(err) {
+    setError('Mikrofon: ' + err.message);
+  });
+}
+
+function stopRecording() {
+  recording = false;
+  btn.textContent = 'START MIC';
+  btn.className = 'btn';
+  timerEl.className = 'timer';
+  clearInterval(window._flushTimer);
+  clearInterval(window._dataTimer);
+  clearInterval(window._timerInt);
+  if (recorder && recorder.state === 'recording') {
+    try { recorder.stop(); } catch (e) {}
+  }
+  recorder = null;
+  if (stream) {
+    stream.getTracks().forEach(function(t) { t.stop(); });
+    stream = null;
+  }
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = null;
+  analyser = null;
+  stopSilentAudio();
+  if (actx) { try { actx.close(); } catch (e) {} actx = null; }
+  if (window._wakeLock) {
+    try { window._wakeLock.release(); } catch (e) {}
+    window._wakeLock = null;
+  }
+  setInfo('Zatrzymano', '');
+  vizCtx.fillStyle = '#0a0a2a';
+  vizCtx.fillRect(0, 0, 260, 50);
+  log('stopped');
+  // Reconnect WS if needed
+  if (!wsAvailable) setTimeout(connectWs, 1000);
+}
+
+function drawViz() {
+  if (!analyser) return;
+  animFrame = requestAnimationFrame(drawViz);
+  var data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  vizCtx.fillStyle = '#0a0a2a';
+  vizCtx.fillRect(0, 0, 260, 50);
+  var barW = 260 / data.length;
+  for (var i = 0; i < data.length; i++) {
+    var h = (data[i] / 255) * 44;
+    vizCtx.fillStyle = recording ? (h > 25 ? '#ff4444' : '#ff444466') : '#333';
+    vizCtx.fillRect(i * barW, 50 - h, Math.max(1, barW - 1), h);
+  }
+}
+
+// ── Lie detector ──
+function showLieAlert(d) {
+  if (d.chunk_idx <= lastLieIdx) return; // already shown
+  lastLieIdx = d.chunk_idx || 0;
+  lieCount++;
+  lieCountEl.textContent = lieCount + ' niespojnosc' + (lieCount === 1 ? '' : 'i');
+  lieCountEl.className = 'lie-count show';
+
+  var sev = d.severity || 'low';
+  lieSpeaker.textContent = d.speaker || '?';
+  lieSeverity.textContent = sev;
+  lieSeverity.className = 'lie-severity ' + sev;
+  lieClaim.textContent = d.claim || '';
+  lieContra.textContent = d.contradiction || '';
+  lieReason.textContent = d.reasoning || '';
+  lieAlert.className = 'lie-alert show ' + sev;
+
+  // Vibration pattern based on severity
+  if (navigator.vibrate) {
+    if (sev === 'high') {
+      navigator.vibrate([200, 100, 200, 100, 400]); // strong triple
+    } else if (sev === 'medium') {
+      navigator.vibrate([150, 80, 250]); // double
+    } else {
+      navigator.vibrate([100, 50, 100]); // gentle double
+    }
+  }
+
+  // Auto-hide after 30s
+  clearTimeout(window._lieTimeout);
+  window._lieTimeout = setTimeout(function() {
+    lieAlert.className = 'lie-alert';
+  }, 30000);
+}
+
+lieDismiss.addEventListener('click', function() {
+  lieAlert.className = 'lie-alert';
+});
+
+// HTTP polling fallback for lie detector (when WS doesn't work)
+function pollLieDetector() {
+  if (!recording) return;
+  fetch(VAULT_HTTP + '/lie-detector', {
+    signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.lie_detector && d.chunk_idx > lastLieIdx) {
+        showLieAlert(d);
+      }
+    })
+    .catch(function() {});
+}
+
+// ── Visibility change — resume audio on iOS ──
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && recording) {
+    if (actx && actx.state === 'suspended') actx.resume();
+    log('resumed');
+  }
+});
+
+// ── Init ──
+checkVault();
+setInterval(checkVault, 15000); // keep checking vault
+setInterval(function() {
+  if (recording && !wsAvailable) pollLieDetector();
+}, 10000); // poll lie detector every 10s if no WS
+connectWs();
+</script>
+</body>
+</html>

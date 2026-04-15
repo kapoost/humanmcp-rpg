@@ -169,10 +169,14 @@ case "$choice" in
   if [ -d "$VAULT_DIR" ]; then
     echo -e "  ${Y}Starting mysloodsiewnia...${N}"
     cd "$VAULT_DIR"
-    if [ -d ".venv" ]; then
+    if [ -f ".venv/bin/uvicorn" ]; then
+      .venv/bin/uvicorn main:app --port 7331 &
+    elif [ -d ".venv" ]; then
       source .venv/bin/activate
+      uvicorn main:app --port 7331 &
+    else
+      uvicorn main:app --port 7331 &
     fi
-    python main.py &
     PIDS+=($!)
     sleep 2
     status_line "Vault" "7331" "ok"
@@ -231,8 +235,14 @@ case "$choice" in
   # Vault
   if [ -d "$VAULT_DIR" ]; then
     cd "$VAULT_DIR"
-    [ -d ".venv" ] && source .venv/bin/activate
-    python main.py &
+    if [ -f ".venv/bin/uvicorn" ]; then
+      .venv/bin/uvicorn main:app --port 7331 &
+    elif [ -d ".venv" ]; then
+      source .venv/bin/activate
+      uvicorn main:app --port 7331 &
+    else
+      uvicorn main:app --port 7331 &
+    fi
     PIDS+=($!)
     sleep 2
 

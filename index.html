@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src http://localhost:3001 http://localhost:7331 https://localhost:7331 ws://localhost:7331 wss://localhost:7331 http://192.168.1.13:7331 https://192.168.1.13:7331 ws://192.168.1.13:7331 wss://192.168.1.13:7331">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' blob:; connect-src http://localhost:3001 http://localhost:7331 https://localhost:7331 ws://localhost:7331 wss://localhost:7331 http://192.168.1.13:7331 https://192.168.1.13:7331 ws://192.168.1.13:7331 wss://192.168.1.13:7331 http://localhost:11434">
   <title>humanMCP — RPG Client</title>
   <style>
     @font-face {
@@ -118,6 +118,8 @@
     <div class="btn-tab" data-key="Tab">TAB</div>
   </div>
   <input id="mobile-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <script src="lib/pixi.min.js"></script>
+  <script src="pixi-faces.js"></script>
   <script src="engine.js"></script>
 </body>
 </html>

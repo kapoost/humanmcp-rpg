@@ -7,9 +7,14 @@ import https from 'https';
 import crypto from 'crypto';
 
 const args = process.argv.slice(2);
-const PORT = parseInt(args[args.indexOf('--port') + 1]) || 3001;
-const MCP_URL = args[args.indexOf('--mcp') + 1] || 'https://kapoost-humanmcp.fly.dev/mcp';
-const ORIGIN = args[args.indexOf('--origin') + 1] || 'http://localhost:8080';
+function argVal(flag, fallback) {
+  const i = args.indexOf(flag);
+  return i !== -1 && i + 1 < args.length ? args[i + 1] : fallback;
+}
+const PORT = parseInt(argVal('--port', '3001'));
+const MCP_URL = argVal('--mcp', 'https://kapoost-humanmcp.fly.dev/mcp');
+const ORIGIN = argVal('--origin', 'http://localhost:8080');
+const SESSION_CODE = argVal('--session', process.env.SESSION_SECRET || '');
 const MAX_BODY = 10240; // 10KB max request body
 
 // Session token — printed at startup, required for all /call requests
@@ -53,6 +58,19 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
+  // Token endpoint — only serve to configured origin
+  if (req.method === 'GET' && req.url === '/token') {
+    const origin = req.headers['origin'] || '';
+    if (origin && origin !== ORIGIN) {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ token: TOKEN }));
     return;
   }
 
@@ -174,7 +192,14 @@ server.listen(PORT, () => {
   console.log(`  MCP:    ${MCP_URL}`);
   console.log(`  Origin: ${ORIGIN}`);
   console.log(`  Token:  ${TOKEN}`);
-  console.log(`\n  ⚠ Pass this token to the client to authorize requests.`);
-  console.log(`  Allowed tools: ${[...ALLOWED_TOOLS].join(', ')}`);
+  console.log(`  Session: ${SESSION_CODE ? 'auto-bootstrap' : 'manual'}`);
+  console.log(`\n  Allowed tools: ${[...ALLOWED_TOOLS].join(', ')}`);
   console.log(``);
+
+  // Auto-bootstrap session if code provided
+  if (SESSION_CODE) {
+    callMcp('bootstrap_session', { code: SESSION_CODE, format: 'minimal' })
+      .then(() => console.log('  ✓ Session bootstrapped'))
+      .catch(e => console.log(`  ✗ Bootstrap failed: ${e.message}`));
+  }
 });
