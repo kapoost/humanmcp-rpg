@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "4b7346b7-08ad-46e7-ae86-b7068782d9b3",
-    "name": "Hermes Face",
-    "prompt": "Bearded man in white shirt. Anime portrait, big eyes.",
+    "id": "2ecd78c3-908d-4cb9-aab6-80a9831a9b18",
+    "name": "Hermes",
+    "prompt": "Young man with sandy blond hair, blue tunic with gold accents, carrying a winged caduceus staff. Messenger and process optimizer archetype. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:10:14.219515+00:00"
+    "created_at": "2026-04-15T12:59:13.168384+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:12.744207"
+  "export_date": "2026-04-15T13:06:50.732214"
 }

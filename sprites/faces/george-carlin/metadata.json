@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "b0216b39-8bef-4a37-9aed-baa441e4383f",
-    "name": "George Carlin Face",
-    "prompt": "Portrait headshot of old man with grey curly hair, cynical smirk. Anime manga style, big expressive eyes. RPG dialog portrait.",
+    "id": "620a11bd-c7d0-4c70-865d-0a4c7906778b",
+    "name": "George Carlin",
+    "prompt": "Older man with gray beard, dark shirt and jeans, holding a vintage stand-up microphone. Wry expression, comedian and social critic. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:05:51.937942+00:00"
+    "created_at": "2026-04-15T12:59:12.861971+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:09.255500"
+  "export_date": "2026-04-15T13:06:49.288710"
 }

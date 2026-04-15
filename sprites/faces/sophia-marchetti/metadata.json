@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "b5a0ff1d-e7d6-49db-8d1a-6e1dd2a51e0f",
-    "name": "Sophia Marchetti Face",
-    "prompt": "Elegant woman in red dress with dark hair. Anime pixel art portrait.",
+    "id": "353d902f-c0bb-43cd-8064-cae89193ea31",
+    "name": "Sophia Marchetti",
+    "prompt": "Italian woman with dark wavy hair, elegant red dress, holding a small golden theater mask. Charismatic persuasion specialist. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:18:58.970686+00:00"
+    "created_at": "2026-04-15T13:02:07.569626+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:26.657469"
+  "export_date": "2026-04-15T13:12:59.128937"
 }

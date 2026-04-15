@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "78468cdf-8139-45b1-9b98-175245a6233e",
+    "name": "Hermiona Portrait",
+    "prompt": "Young woman with curly brown hair, wearing a deep red robe with gold trim. Warm determined expression. Classic 16-bit JRPG pixel art style.",
+    "size": {
+      "width": 180,
+      "height": 180
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T13:28:41.78614+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T13:32:31.884032"
+}

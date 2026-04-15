@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "929c3a15-97b0-46ad-acae-23730742a922",
-    "name": "Kenji Mori Face",
-    "prompt": "Old kind Japanese man with white hair. Anime portrait, big eyes.",
+    "id": "e3de65d8-3c63-47fb-8197-61432cf9ff59",
+    "name": "Kenji Mori",
+    "prompt": "Japanese man in dark blue mechanic coveralls with oil stains, holding a large wrench. Grease-stained hands, master mechanic. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:10:26.903975+00:00"
+    "created_at": "2026-04-15T12:59:15.15347+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:25.429752"
+  "export_date": "2026-04-15T13:06:52.333797"
 }

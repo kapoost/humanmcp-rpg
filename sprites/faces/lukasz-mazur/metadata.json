@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "d857cbad-618c-454c-bd3c-d64b67348dcc",
-    "name": "Lukasz Mazur Face",
-    "prompt": "Portrait headshot of man with brown hair and tweed jacket, thoughtful look. Anime manga style, big expressive eyes. RPG dialog portrait.",
+    "id": "5864441b-559f-4803-9b8e-d0b244469da2",
+    "name": "Lukasz Mazur",
+    "prompt": "Man with messy brown hair, tweed jacket with elbow patches, holding an open book. Intellectual philosopher, skeptical expression. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:05:54.636499+00:00"
+    "created_at": "2026-04-15T13:02:05.029786+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:10.140066"
+  "export_date": "2026-04-15T13:12:58.489767"
 }

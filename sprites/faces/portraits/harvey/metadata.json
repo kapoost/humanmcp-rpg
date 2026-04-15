@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "70b66411-096e-4b32-aec8-48f89b187f6f",
+    "name": "Harvey Portrait",
+    "prompt": "Man in sharp dark suit with slicked-back hair, carrying a leather briefcase. Confident lawyer. Classic 16-bit JRPG pixel art style.",
+    "size": {
+      "width": 180,
+      "height": 180
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T13:28:46.030552+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T13:32:54.989764"
+}

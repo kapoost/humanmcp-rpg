@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "0b84ce45-1dde-43bf-b037-7018f0e33a31",
+    "name": "Eleanor Voss Portrait",
+    "prompt": "Young woman with auburn hair in a bun, wearing black turtleneck, holding a sketchbook and pencil. Creative UX designer. Classic 16-bit JRPG pixel art style.",
+    "size": {
+      "width": 180,
+      "height": 180
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T13:25:50.659777+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T13:28:41.022762"
+}

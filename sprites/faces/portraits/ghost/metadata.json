@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "c311de69-030f-4925-84e0-c0fbb4feb746",
+    "name": "Ghost Portrait",
+    "prompt": "Hooded figure in dark gray cloak, face partially shadowed, faint green glow from a small device held in hand. Mysterious hacker, red team operative. Classic 16-bit JRPG pixel art style.",
+    "size": {
+      "width": 180,
+      "height": 180
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T13:25:54.218566+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T13:28:41.538196"
+}

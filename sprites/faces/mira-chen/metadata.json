@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "27640f9a-33c6-44e9-b945-e5d8de6ca88c",
-    "name": "Mira Chen Face",
-    "prompt": "Female ninja with ponytail. Anime pixel art portrait.",
+    "id": "352900c9-7b8c-48e4-b721-2be36459996e",
+    "name": "Mira Chen",
+    "prompt": "Young Asian woman with straight black hair, blue blouse, holding a rolled blueprint scroll. Architect and engineer, confident stance. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:18:52.605591+00:00"
+    "created_at": "2026-04-15T12:59:01.284242+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:25.990931"
+  "export_date": "2026-04-15T13:06:45.640789"
 }

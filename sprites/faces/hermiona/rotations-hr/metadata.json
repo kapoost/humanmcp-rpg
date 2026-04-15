@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "56e38bff-bd34-4072-85ce-bb92664d598c",
+    "name": "Hermiona HR",
+    "prompt": "Young woman with curly brown hair, wearing a deep red robe with gold trim. Classic JRPG pixel art portrait style, warm expression, determined eyes. Nostalgic 16-bit RPG aesthetic reminiscent of Final Fantasy VI or Chrono Trigger.",
+    "size": {
+      "width": 180,
+      "height": 180
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T12:49:50.597983+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T12:53:34.941684"
+}

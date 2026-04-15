@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "44786f35-6511-4755-a268-30febdd679ac",
-    "name": "Ghost Face",
-    "prompt": "Hooded mysterious man, dark hood, glowing eyes. Anime portrait, big eyes.",
+    "id": "ebdf5a1e-d085-46b1-8ad5-60fb46c64467",
+    "name": "Ghost",
+    "prompt": "Hooded figure in dark gray cloak, face partially shadowed, faint green glow from a small device held in hand. Mysterious hacker, red team operative. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:08:54.079099+00:00"
+    "created_at": "2026-04-15T12:59:12.700184+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:11.417719"
+  "export_date": "2026-04-15T13:06:48.734375"
 }

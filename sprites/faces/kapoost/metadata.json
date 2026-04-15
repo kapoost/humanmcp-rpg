@@ -1,0 +1,26 @@
+{
+  "character": {
+    "id": "d4de57b3-7fbe-4a6a-a953-b49b7698e4ba",
+    "name": "kapoost",
+    "prompt": "Man with dark full beard and dark brown hair, wearing a dark navy peacoat with brass buttons, holding a small leather-bound notebook in one hand. Sailor, poet and builder. Weathered but determined expression. Classic 16-bit JRPG pixel art style.",
+    "size": {
+      "width": 92,
+      "height": 92
+    },
+    "template_id": "mannequin",
+    "directions": 4,
+    "view": "side",
+    "created_at": "2026-04-15T13:20:13.563122+00:00"
+  },
+  "frames": {
+    "rotations": {
+      "south": "rotations/south.png",
+      "west": "rotations/west.png",
+      "east": "rotations/east.png",
+      "north": "rotations/north.png"
+    },
+    "animations": {}
+  },
+  "export_version": "2.0",
+  "export_date": "2026-04-15T13:23:04.460520"
+}

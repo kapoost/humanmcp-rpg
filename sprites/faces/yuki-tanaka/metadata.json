@@ -1,8 +1,8 @@
 {
   "character": {
-    "id": "fa0a4a05-ea25-481c-b876-0f9ff6ea46f7",
-    "name": "Yuki",
-    "prompt": "Samurai girl. Anime pixel art.",
+    "id": "1207cd1f-a387-4d5b-933a-d65c1106cd02",
+    "name": "Yuki Tanaka",
+    "prompt": "Japanese woman with hair tied back in ponytail, dark tactical jacket, katana strapped on back, small shield emblem on shoulder. Defender and threat hunter. Classic 16-bit JRPG pixel art style.",
     "size": {
       "width": 92,
       "height": 92
@@ -10,7 +10,7 @@
     "template_id": "mannequin",
     "directions": 4,
     "view": "side",
-    "created_at": "2026-04-13T14:20:04.786528+00:00"
+    "created_at": "2026-04-15T13:02:12.84305+00:00"
   },
   "frames": {
     "rotations": {
@@ -22,5 +22,5 @@
     "animations": {}
   },
   "export_version": "2.0",
-  "export_date": "2026-04-13T14:21:27.799313"
+  "export_date": "2026-04-15T13:13:00.824835"
 }
