@@ -7,6 +7,7 @@ const ctx = canvas.getContext('2d');
 // ── Config ──
 
 const PROXY_URL = 'http://localhost:3001';
+const LOCAL_VAULT_URL = 'http://localhost:7331';
 const SCALE = 2;
 const BASE_W = 480;
 const BASE_H = 320;
@@ -92,6 +93,14 @@ let PERSONAS = [
     lv: 99, hp: 999, hpMax: 999, mp: 999, mpMax: 999, engine: 'sonnet',
     stats: { STR: 0.6, INT: 0.95, WIS: 1.0, DEX: 0.7, CHA: 0.85 },
     desc: 'Multi-agent architect, MCP instructions owner. Entropy is her medium.' },
+  { id: 'julka', name: 'Julka', role: 'Deep Research — Science & Bio', color: '#88eebb',
+    lv: 38, hp: 750, hpMax: 750, mp: 300, mpMax: 300, engine: 'sonnet',
+    stats: { STR: 0.4, INT: 0.95, WIS: 0.9, DEX: 0.7, CHA: 0.6 },
+    desc: 'Scientific research, biology, tech deep dives. Cross-verifies sources. Zero hallucination.' },
+  { id: 'ela', name: 'Ela', role: 'Deep Research — Business & Tech', color: '#ffbb66',
+    lv: 38, hp: 750, hpMax: 750, mp: 300, mpMax: 300, engine: 'sonnet',
+    stats: { STR: 0.4, INT: 0.9, WIS: 0.95, DEX: 0.75, CHA: 0.65 },
+    desc: 'Business intelligence, market research, data scripts. Cross-verifies sources. Zero hallucination.' },
 ];
 
 // ── Face Sprite Remap ──
@@ -100,6 +109,252 @@ const FACE_REMAP = {
   // kenji-mori: mechanic overalls sprite → Master Mechanic ✓ (no remap needed)
   // lukasz-mazur: tweed jacket sprite → The Contrarian ✓ (no remap needed)
 };
+
+// ── RPG Progression System ──
+
+// Engine↔Vault ID mapping (engine uses full names, vault uses short slugs)
+const ENGINE_TO_VAULT = {
+  'hermes': 'hermes', 'mira-chen': 'mira', 'ghost': 'ghost',
+  'eleanor-voss': 'eleanor', 'axel-brandt': 'axel', 'harvey': 'harvey',
+  'lukasz-mazur': 'contrarian', 'hermiona': 'notatnik', 'george-carlin': 'carlin',
+};
+const VAULT_TO_ENGINE = {};
+Object.keys(ENGINE_TO_VAULT).forEach(k => { VAULT_TO_ENGINE[ENGINE_TO_VAULT[k]] = k; });
+
+const PROGRESSION_KEY = 'hmcp_rpg_progression';
+
+function xpForLevel(lv) {
+  return Math.floor(100 * Math.pow(lv, 1.5));
+}
+
+const ACHIEVEMENTS = [
+  { id: 'first_session', name: 'First Contact', desc: 'Complete your first live session', icon: '⚡', check: p => (p.prog.sessions || 0) >= 1 },
+  { id: 'ten_sessions', name: 'Regular', desc: 'Participate in 10 sessions', icon: '🔁', check: p => (p.prog.sessions || 0) >= 10 },
+  { id: 'fifty_contrib', name: 'Veteran', desc: '50 contributions total', icon: '🏅', check: p => (p.prog.totalContribs || 0) >= 50 },
+  { id: 'lv10', name: 'Double Digits', desc: 'Reach level 10', icon: '🔟', check: p => p.lv >= 10 },
+  { id: 'lv25', name: 'Silver Rank', desc: 'Reach level 25', icon: '🥈', check: p => p.lv >= 25 },
+  { id: 'lv50', name: 'Gold Rank', desc: 'Reach level 50', icon: '🥇', check: p => p.lv >= 50 },
+  { id: 'mp_drain', name: 'Burnt Out', desc: 'Use up all MP in a session', icon: '💀', check: p => (p.prog.mpDrained || false) },
+  { id: 'streak3', name: 'On a Roll', desc: '3 sessions in 3 days', icon: '🔥', check: p => (p.prog.streak || 0) >= 3 },
+  { id: 'multi5', name: 'Council Voice', desc: '5+ contributions in one session', icon: '🗣', check: p => (p.prog.maxContribSession || 0) >= 5 },
+  { id: 'notebook5', name: 'Chronicler', desc: '5 notebook entries', icon: '📖', check: p => (p.prog.notebook || []).length >= 5 },
+];
+
+// Notebook fallback voices — used when vault AI is unreachable
+const NOTEBOOK_VOICE = {
+  'ghost': (lv) => `[SIGINT log #${lv}] Another level. Trust no one—especially yourself at 3 AM.`,
+  'mira-chen': (lv) => `Architecture note: At level ${lv}, the system complexity graph shifts.`,
+  'george-carlin': (lv) => `Level ${lv}. Still nobody knows what they're doing. Including me.`,
+  'default': (lv) => `Poziom ${lv}. Kolejna sesja za nami.`,
+};
+
+function _applyProgData(saved) {
+  PERSONAS.forEach(p => {
+    const s = saved[p.id] || {};
+    p.prog = {
+      xp: s.xp || 0,
+      sessions: s.sessions || 0,
+      totalContribs: s.totalContribs || s.contributions || 0,
+      maxContribSession: s.maxContribSession || s.max_contrib_session || 0,
+      mpDrained: s.mpDrained || s.mp_drained || false,
+      streak: s.streak || 0,
+      lastSessionDate: s.lastSessionDate || s.last_session_date || null,
+      achievements: s.achievements || [],
+      notebook: s.notebook || [],
+      appliedTier: s.applied_tier || s.appliedTier || 0,
+      relationships: s.relationships || {},
+      modelTier: s.model_tier || s.modelTier || '',
+    };
+    // Recalculate level from XP
+    let lv = 1;
+    let remaining = p.prog.xp;
+    while (remaining >= xpForLevel(lv)) {
+      remaining -= xpForLevel(lv);
+      lv++;
+    }
+    p.lv = lv;
+    p.prog._xpInLevel = remaining;
+  });
+}
+
+function loadProgression() {
+  // Try vault first, fall back to localStorage
+  fetch(LOCAL_VAULT_URL + '/progression')
+    .then(r => r.ok ? r.json() : Promise.reject('vault'))
+    .then(saved => {
+      _applyProgData(saved);
+      // Mirror to localStorage as backup
+      try { localStorage.setItem(PROGRESSION_KEY, JSON.stringify(saved)); } catch (_) {}
+    })
+    .catch(() => {
+      // Fallback: localStorage
+      try {
+        const raw = localStorage.getItem(PROGRESSION_KEY);
+        _applyProgData(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        console.warn('Progression load failed:', e);
+        PERSONAS.forEach(p => {
+          p.prog = { xp: 0, sessions: 0, totalContribs: 0, maxContribSession: 0,
+            mpDrained: false, streak: 0, lastSessionDate: null, achievements: [], notebook: [], appliedTier: 0 };
+          p.prog._xpInLevel = 0;
+        });
+      }
+    });
+}
+
+function _buildProgData() {
+  const data = {};
+  PERSONAS.forEach(p => {
+    if (!p.prog) return;
+    data[p.id] = {
+      xp: p.prog.xp,
+      sessions: p.prog.sessions,
+      totalContribs: p.prog.totalContribs,
+      maxContribSession: p.prog.maxContribSession,
+      mpDrained: p.prog.mpDrained,
+      streak: p.prog.streak,
+      lastSessionDate: p.prog.lastSessionDate,
+      achievements: p.prog.achievements,
+      notebook: p.prog.notebook,
+      applied_tier: p.prog.appliedTier || 0,
+      relationships: p.prog.relationships || {},
+      model_tier: p.prog.modelTier || '',
+    };
+  });
+  return data;
+}
+
+function saveProgression() {
+  const data = _buildProgData();
+  // Save to vault (triggers evolution tier check server-side)
+  fetch(LOCAL_VAULT_URL + '/progression', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+  // Always mirror to localStorage as backup
+  try { localStorage.setItem(PROGRESSION_KEY, JSON.stringify(data)); } catch (_) {}
+}
+
+function awardXP(persona, amount) {
+  if (!persona.prog) return [];
+  persona.prog.xp += amount;
+  const events = [];
+  let leveled = false;
+  let remaining = persona.prog._xpInLevel + amount;
+  while (remaining >= xpForLevel(persona.lv)) {
+    remaining -= xpForLevel(persona.lv);
+    persona.lv++;
+    leveled = true;
+    events.push({ type: 'levelup', persona: persona.id, lv: persona.lv });
+  }
+  persona.prog._xpInLevel = remaining;
+  // Check achievements
+  let latestAchievement = '';
+  ACHIEVEMENTS.forEach(a => {
+    if (!persona.prog.achievements.includes(a.id) && a.check(persona)) {
+      persona.prog.achievements.push(a.id);
+      events.push({ type: 'achievement', persona: persona.id, achievement: a });
+      latestAchievement = a.name;
+    }
+  });
+  // Trigger vault evolution on level-up or new achievement
+  if (leveled || latestAchievement) {
+    const coParticipants = Object.keys(state._sessionXP || {}).map(id => ENGINE_TO_VAULT[id] || id);
+    _evolvePersona(persona, coParticipants, latestAchievement);
+  }
+  saveProgression();
+  return events;
+}
+
+function _evolvePersona(persona, coParticipants, achievement) {
+  // Call vault to evolve persona — AI updates prompt + generates notebook entry
+  const fallbackVoice = NOTEBOOK_VOICE[persona.id] || NOTEBOOK_VOICE['default'] || ((lv) => `Lv ${lv}.`);
+  const vaultId = ENGINE_TO_VAULT[persona.id] || persona.id;
+  fetch(LOCAL_VAULT_URL + '/persona/' + vaultId + '/evolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      level: persona.lv,
+      sessions: persona.prog.sessions || 0,
+      contributions: persona.prog.totalContribs || 0,
+      co_participants: coParticipants,
+      achievement: achievement || '',
+    }),
+  })
+    .then(r => r.ok ? r.json() : Promise.reject('evolve'))
+    .then(result => {
+      // Use AI-generated notebook entry, or fallback
+      persona.prog.notebook.push({
+        lv: persona.lv,
+        text: result.notebook || fallbackVoice(persona.lv),
+        date: new Date().toISOString(),
+      });
+      if (result.evolution) {
+        persona.desc = result.evolution; // Update visible description too
+      }
+      saveProgression();
+    })
+    .catch(() => {
+      // Fallback: use static template
+      persona.prog.notebook.push({
+        lv: persona.lv,
+        text: fallbackVoice(persona.lv),
+        date: new Date().toISOString(),
+      });
+      saveProgression();
+    });
+}
+
+// ── Micro-comments: short, event-driven notebook entries during session ──
+
+const MICRO_TRIGGERS = {
+  first_contrib:  (p) => `Pierwszy wkład w tej sesji.`,
+  contrib_5:      (p) => `5 wkładów — rozkręcam się.`,
+  contrib_10:     (p) => `10 wkładów. Dziś nie odpuszczam.`,
+  mp_low:         (p) => `MP na wyczerpaniu. Czas na regenerację.`,
+  mp_drained:     (p) => `Wypalenie. Dałem z siebie wszystko.`,
+  new_speaker:    (p, ctx) => `Nowy głos: ${ctx}. Ciekawe co wniesie.`,
+  long_session:   (p) => `Sesja trwa 30+ min. Wciągająca rozmowa.`,
+};
+
+function _microComment(persona, trigger, ctx) {
+  if (!persona.prog) return;
+  // Deduplicate: don't repeat same trigger in this session
+  const key = trigger + ':' + persona.id;
+  if (!state._microSeen) state._microSeen = {};
+  if (state._microSeen[key]) return;
+  state._microSeen[key] = true;
+
+  const gen = MICRO_TRIGGERS[trigger];
+  if (!gen) return;
+  const text = gen(persona, ctx);
+  persona.prog.notebook.push({
+    lv: persona.lv,
+    text,
+    date: new Date().toISOString(),
+    micro: true,
+  });
+  // Don't save immediately — batch with next saveProgression()
+}
+
+function estimateTokens(text) {
+  // Rough: ~4 chars per token for English, ~3 for mixed
+  return Math.ceil((text || '').length / 3.5);
+}
+
+function drainMP(persona, tokens) {
+  if (!persona.prog) return;
+  const cost = Math.ceil(tokens / 10); // 1 MP per ~10 tokens
+  persona.mp = Math.max(0, persona.mp - cost);
+  if (persona.mp === 0) persona.prog.mpDrained = true;
+}
+
+function regenMP() {
+  PERSONAS.forEach(p => {
+    p.mp = Math.min(p.mpMax, p.mp + Math.ceil(p.mpMax * 0.3));
+  });
+}
 
 // ── Skills Data ──
 
@@ -211,6 +466,64 @@ function initAudio() {
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.02);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.02);
+  };
+
+  SFX.battle = () => {
+    // FF7 battle encounter — rising sweep + impact
+    const t = audioCtx.currentTime;
+    // Sweep up
+    const sweep = audioCtx.createOscillator();
+    const sweepGain = audioCtx.createGain();
+    sweep.connect(sweepGain);
+    sweepGain.connect(audioCtx.destination);
+    sweep.type = 'sawtooth';
+    sweep.frequency.setValueAtTime(200, t);
+    sweep.frequency.exponentialRampToValueAtTime(2000, t + 0.4);
+    sweepGain.gain.setValueAtTime(0.15, t);
+    sweepGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    sweep.start(t);
+    sweep.stop(t + 0.5);
+    // Impact hit
+    const hit = audioCtx.createOscillator();
+    const hitGain = audioCtx.createGain();
+    hit.connect(hitGain);
+    hitGain.connect(audioCtx.destination);
+    hit.type = 'square';
+    hit.frequency.value = 80;
+    hitGain.gain.setValueAtTime(0.2, t + 0.4);
+    hitGain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    hit.start(t + 0.4);
+    hit.stop(t + 0.8);
+    // Fanfare notes
+    const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.type = 'square';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.08, t + 0.8 + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.8 + i * 0.12 + 0.3);
+      o.start(t + 0.8 + i * 0.12);
+      o.stop(t + 0.8 + i * 0.12 + 0.3);
+    });
+  };
+
+  SFX.alert = () => {
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(600, t);
+    o.frequency.setValueAtTime(900, t + 0.15);
+    o.frequency.setValueAtTime(600, t + 0.3);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    o.start(t);
+    o.stop(t + 0.4);
   };
 
   SFX.locked = () => {
@@ -358,8 +671,9 @@ const CONTENT_IMAGES = {
 // ── State ──
 
 const state = {
-  scene: 'title',       // title | menu | dialog | team | content | reading | skills | about
+  scene: 'title',       // title | menu | dialog | team | content | reading | skills | about | settings
   faces: {},             // loaded face images
+  portraits: {},         // HR 180x180 portraits for detail/dialog
   contentImages: {},     // loaded content images
   facesLoaded: 0,
   typewriter: null,      // current typewriter animation
@@ -384,6 +698,10 @@ const state = {
   logItems: [],
   logCursor: 0,
   logBody: null,
+  logSlug: null,      // current transcript slug
+  logBrief: null,     // cached brief data {summary, sections}
+  logBriefMode: false, // true = show brief, false = show raw
+  logBriefLoading: false,
   logLoading: false,
   naradaPrompt: '',
   naradaResults: null,
@@ -400,16 +718,42 @@ const state = {
   liveSpeakers: {},       // {name: {color, seconds, percent, avatar}}
   livePersonaQueue: [],   // incoming persona comments to stagger
   liveScroll: 0,
+  liveWhoCursor: 0,
+  liveWhoFocused: true,  // sidebar focused when idle (no recording)
   liveSummary: null,
+  _lastChunkSent: 0,    // timestamp of last audio chunk sent to vault
+  _vaultOk: false,       // vault connection status
+  _wsOk: false,          // WebSocket connection status
+  _phoneMic: null,       // phone mic WebSocket
+  _phoneMicOk: false,    // phone mic connected
+  _sessionXP: {},        // {personaId: {contributions: N, tokens: N}} — reset each session
+  _sessionEvents: [],    // levelups/achievements from this session
+  teamTab: 0,            // 0=stats, 1=achievements, 2=notebook
   liveMood: null,        // {mood, icon, label, color}
   liveMoodTime: 0,
+  liveCharacters: {},       // {speakerId: {name, epithet, traits, seconds, percent, color}}
+  liveEvents: [],           // [{event, title, detail, severity, time}]
+  _liveEventAnim: null,     // current event animation state
   messageText: '',
   messageSent: false,
   proxyAvailable: false,
   proxyToken: '',
   sessionCode: '',
   serverUrl: '',
+  anthropicKey: '',
   connected: false,
+  settingsField: 0,  // 0 = URL, 1 = session code, 2 = API key
+  settingsUrl: '',
+  settingsSession: '',
+  settingsKey: '',
+  // Launcher state
+  _launcherProbed: false,
+  _launcherStatus: {
+    proxy: 'checking',   // 'checking' | 'online' | 'offline'
+    vault: 'checking',
+    ollama: 'checking',
+  },
+  _launcherAutoConnect: false,
   inputActive: false,
   inputText: '',
   tokenInput: '',
@@ -419,6 +763,104 @@ const state = {
   starField: [],
   seenTips: {},  // one-time George Carlin tips per scene
 };
+
+// ── Settings persistence ──
+
+function loadSettings() {
+  return {
+    serverUrl: localStorage.getItem('hmcp_server_url') || 'https://kapoost-humanmcp.fly.dev/mcp',
+    sessionCode: localStorage.getItem('hmcp_session_code') || '',
+    anthropicKey: localStorage.getItem('hmcp_anthropic_key') || '',
+  };
+}
+
+function saveSettings(s) {
+  localStorage.setItem('hmcp_server_url', s.serverUrl);
+  localStorage.setItem('hmcp_session_code', s.sessionCode);
+  if (s.anthropicKey) localStorage.setItem('hmcp_anthropic_key', s.anthropicKey);
+  else localStorage.removeItem('hmcp_anthropic_key');
+}
+
+// ── Direct MCP (no proxy) ──
+
+const ALLOWED_TOOLS = new Set([
+  'get_author_profile', 'list_content', 'read_content', 'verify_content',
+  'get_certificate', 'list_personas', 'get_persona', 'list_skills', 'get_skill',
+  'list_blobs', 'query_vault', 'recall', 'leave_comment', 'leave_message',
+  'request_access', 'submit_answer', 'about_humanmcp', 'bootstrap_session',
+]);
+
+const VAULT_FEATURES = new Set(['Live', 'Log', 'Narada']);
+
+async function mcpDirect(url, tool, args) {
+  if (!ALLOWED_TOOLS.has(tool)) throw new Error(`Tool ${tool} not allowed`);
+  const payload = {
+    jsonrpc: '2.0',
+    id: crypto.randomUUID(),
+    method: 'tools/call',
+    params: { name: tool, arguments: args || {} }
+  };
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  const texts = (data.result?.content || []).filter(c => c.type === 'text');
+  return texts.map(c => c.text).join('\n');
+}
+
+// ── Launcher — probe all servers ──
+
+async function launcherProbe() {
+  if (state._launcherProbed) return;
+  state._launcherProbed = true;
+
+  // Probe all three in parallel
+  const probes = [
+    // Proxy
+    fetch(`${PROXY_URL}/health`, { signal: AbortSignal.timeout(2000) })
+      .then(r => r.json())
+      .then(d => {
+        state._launcherStatus.proxy = d.status === 'ok' ? 'online' : 'offline';
+        // Auto-fetch token
+        if (d.status === 'ok') {
+          return fetch(`${PROXY_URL}/token`, { signal: AbortSignal.timeout(1000) })
+            .then(r => r.json())
+            .then(t => { if (t.token) state.proxyToken = t.token; })
+            .catch(() => {});
+        }
+      })
+      .catch(() => { state._launcherStatus.proxy = 'offline'; }),
+
+    // Vault
+    fetch(`${LOCAL_VAULT_URL}/health`, { signal: AbortSignal.timeout(2000) })
+      .then(r => { state._launcherStatus.vault = r.ok ? 'online' : 'offline'; })
+      .catch(() => { state._launcherStatus.vault = 'offline'; }),
+
+    // Ollama
+    fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) })
+      .then(r => { state._launcherStatus.ollama = r.ok ? 'online' : 'offline'; })
+      .catch(() => { state._launcherStatus.ollama = 'offline'; }),
+  ];
+
+  await Promise.allSettled(probes);
+
+  // Mark ready but don't auto-connect — user presses ENTER
+  if (state._launcherStatus.proxy === 'online' && state.proxyToken) {
+    state._launcherAutoConnect = true; // used for status display only
+  }
+}
+
+// Re-probe (triggered by user pressing R on title screen)
+function launcherReprobe() {
+  state._launcherProbed = false;
+  state._launcherAutoConnect = false;
+  state._launcherStatus = { proxy: 'checking', vault: 'checking', ollama: 'checking' };
+  launcherProbe();
+}
 
 // ── Init ──
 
@@ -442,6 +884,21 @@ function init() {
 
   // load faces
   loadFaces();
+
+  // load HR portraits for detail/dialog
+  loadPortraits();
+
+  // init animated face thumbnails (Pixi.js offscreen)
+  if (window.PixiFaces) PixiFaces.init(PERSONAS);
+
+  // load settings from localStorage
+  const savedSettings = loadSettings();
+  state.serverUrl = savedSettings.serverUrl;
+  state.sessionCode = savedSettings.sessionCode;
+  state.anthropicKey = savedSettings.anthropicKey;
+
+  // load progression from localStorage
+  loadProgression();
 
   // load author avatar
   const authorImg = new Image();
@@ -487,12 +944,15 @@ function init() {
 
     // auto-focus mobile input on text scenes
     setInterval(() => {
-      const textScene = ['connect', 'vault', 'message', 'narada'].includes(state.scene);
+      const textScene = ['connect', 'vault', 'message', 'narada', 'settings'].includes(state.scene);
       if (textScene && document.activeElement !== mobileInput) {
         mobileInput.focus();
       }
     }, 500);
   }
+
+  // probe servers on startup
+  launcherProbe();
 
   // start render loop
   requestAnimationFrame(loop);
@@ -544,6 +1004,19 @@ function loadFaces() {
   });
 }
 
+function loadPortraits() {
+  PERSONAS.forEach(p => {
+    const img = new Image();
+    img.onload = () => { state.portraits[p.id] = img; };
+    // silently skip if no portrait exists
+    img.src = `sprites/faces/portraits/${p.id}/rotations/south.png`;
+  });
+  // also load kapoost portrait
+  const k = new Image();
+  k.onload = () => { state.portraits['kapoost'] = k; };
+  k.src = 'sprites/faces/portraits/kapoost/rotations/south.png';
+}
+
 // ── Render Loop ──
 
 let lastTime = 0;
@@ -557,6 +1030,9 @@ function loop(time) {
 }
 
 function update(dt) {
+  // update animated face thumbnails
+  if (window.PixiFaces && PixiFaces.enabled) PixiFaces.update(dt);
+
   // update starfield
   state.starField.forEach(s => {
     s.y += s.speed;
@@ -600,6 +1076,7 @@ function render() {
     case 'reading': renderReading(); break;
     case 'skills': renderSkills(); break;
     case 'about': renderAbout(); break;
+    case 'settings': renderSettings(); break;
     case 'vault': renderVault(); break;
     case 'message': renderMessage(); break;
     case 'log': renderLog(); break;
@@ -607,6 +1084,347 @@ function render() {
     case 'live': renderLive(); break;
     case 'live-summary': renderLiveSummary(); break;
   }
+
+  // ── Battle encounter overlay ──
+  if (state._encounter) renderEncounter();
+}
+
+// ── FF7 Battle Encounter Animation ──
+
+function triggerEncounter(title, subtitle, text, color) {
+  state._encounter = {
+    start: Date.now(),
+    title: title || 'ENCOUNTER',
+    subtitle: subtitle || '',
+    text: text || '',
+    color: color || '#ffcc00',
+    phase: 0, // 0=wipe, 1=flash, 2=card, 3=fadeout
+  };
+  playSfx('battle');
+}
+
+function dismissEncounter() {
+  if (state._encounter && state._encounter.phase >= 2) {
+    state._encounter.phase = 3;
+    state._encounter.phaseStart = Date.now();
+  }
+}
+
+function renderEncounter() {
+  const enc = state._encounter;
+  const elapsed = Date.now() - enc.start;
+
+  // Phase 0: Diagonal wipe (0-400ms)
+  if (enc.phase === 0) {
+    const t = Math.min(1, elapsed / 400);
+    // Diagonal slashes sweeping across screen
+    const numSlashes = 6;
+    for (let i = 0; i < numSlashes; i++) {
+      const offset = (t * (BASE_W + BASE_H + 200)) - i * 60;
+      if (offset < -60 || offset > BASE_W + BASE_H + 60) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(offset, 0);
+      ctx.lineTo(offset + 40, 0);
+      ctx.lineTo(offset + 40 - BASE_H, BASE_H);
+      ctx.lineTo(offset - BASE_H, BASE_H);
+      ctx.closePath();
+      const alpha = Math.max(0, 1 - Math.abs(offset - (BASE_W / 2)) / (BASE_W));
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
+      ctx.fill();
+      ctx.restore();
+    }
+    if (elapsed > 400) { enc.phase = 1; enc.phaseStart = Date.now(); }
+  }
+
+  // Phase 1: White flash (400-700ms)
+  if (enc.phase === 1) {
+    const ft = (Date.now() - enc.phaseStart) / 300;
+    const flashAlpha = ft < 0.3 ? ft / 0.3 : Math.max(0, 1 - (ft - 0.3) / 0.7);
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+    ctx.fillRect(0, 0, BASE_W, BASE_H);
+    if (ft >= 1) { enc.phase = 2; enc.phaseStart = Date.now(); }
+  }
+
+  // Phase 2: Full-screen boss card
+  if (enc.phase === 2) {
+    const ct = Math.min(1, (Date.now() - enc.phaseStart) / 500);
+
+    // Black background with scanlines
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, BASE_W, BASE_H);
+
+    // Animated scanlines
+    ctx.fillStyle = '#ffffff08';
+    for (let sy = (Date.now() / 50 % 4); sy < BASE_H; sy += 4) {
+      ctx.fillRect(0, sy, BASE_W, 1);
+    }
+
+    // Dramatic red/gold border glow
+    const glowPulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.005);
+    const borderCol = enc.color;
+    ctx.shadowColor = borderCol;
+    ctx.shadowBlur = 20 * glowPulse;
+    ctx.strokeStyle = borderCol;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 20, BASE_W - 40, BASE_H - 40);
+    ctx.shadowBlur = 0;
+
+    // Inner border
+    ctx.strokeStyle = borderCol + '44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(26, 26, BASE_W - 52, BASE_H - 52);
+
+    // Corner accents
+    const corners = [[24, 24], [BASE_W - 24, 24], [24, BASE_H - 24], [BASE_W - 24, BASE_H - 24]];
+    corners.forEach(([cx, cy]) => {
+      ctx.fillStyle = borderCol;
+      ctx.fillRect(cx - 4, cy - 4, 8, 8);
+    });
+
+    // "ENCOUNTER" label — slides in from top
+    const slideY = 60 + (1 - ct) * -40;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 8px "Courier New", monospace';
+    ctx.fillStyle = '#ff444488';
+    ctx.fillText('— E N C O U N T E R —', BASE_W / 2, slideY);
+
+    // Main title — big, dramatic, with shadow
+    const titleY = 110 + (1 - ct) * -20;
+    ctx.font = 'bold 22px "Courier New", monospace';
+    // Shadow
+    ctx.fillStyle = '#000';
+    ctx.fillText(enc.title, BASE_W / 2 + 2, titleY + 2);
+    // Glow
+    ctx.shadowColor = borderCol;
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = borderCol;
+    ctx.fillText(enc.title, BASE_W / 2, titleY);
+    ctx.shadowBlur = 0;
+
+    // Subtitle
+    if (enc.subtitle) {
+      ctx.font = '11px "Courier New", monospace';
+      ctx.fillStyle = '#aaaaaa';
+      ctx.fillText(enc.subtitle, BASE_W / 2, titleY + 28);
+    }
+
+    // Decorative line
+    const lineW = 120 * ct;
+    ctx.strokeStyle = borderCol + '66';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(BASE_W / 2 - lineW, titleY + 40);
+    ctx.lineTo(BASE_W / 2 + lineW, titleY + 40);
+    ctx.stroke();
+
+    // Body text — typewriter effect
+    if (enc.text) {
+      const textElapsed = Math.max(0, Date.now() - enc.phaseStart - 600);
+      const charsToShow = Math.floor(textElapsed / 30);
+      const visibleText = enc.text.substring(0, charsToShow);
+
+      ctx.font = '10px "Courier New", monospace';
+      ctx.fillStyle = '#cccccc';
+      const lines = [];
+      const words = visibleText.split(' ');
+      let line = '';
+      words.forEach(w => {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > BASE_W - 80) {
+          lines.push(line);
+          line = w;
+        } else {
+          line = test;
+        }
+      });
+      if (line) lines.push(line);
+      lines.forEach((l, i) => {
+        ctx.fillText(l, BASE_W / 2, titleY + 60 + i * 16);
+      });
+    }
+
+    // Bottom hint — pulsing
+    const hintAlpha = 0.3 + 0.3 * Math.sin(Date.now() * 0.004);
+    ctx.font = '8px "Courier New", monospace';
+    ctx.fillStyle = `rgba(255, 255, 255, ${hintAlpha})`;
+    ctx.fillText('press any key', BASE_W / 2, BASE_H - 40);
+
+    ctx.textAlign = 'left'; // reset
+  }
+
+  // Phase 3: Fade out (300ms)
+  if (enc.phase === 3) {
+    const fo = (Date.now() - enc.phaseStart) / 300;
+    if (fo < 1) {
+      ctx.fillStyle = `rgba(0, 0, 0, ${1 - fo})`;
+      ctx.fillRect(0, 0, BASE_W, BASE_H);
+    } else {
+      state._encounter = null;
+    }
+  }
+}
+
+// ── Live Event Animation (non-blocking notification overlay) ──
+
+const LIVE_EVENT_ICONS = {
+  topic_change: '\u25C6',    // ◆
+  key_decision: '\u2726',    // ✦
+  summary_relevant: '\u2605', // ★
+  name_detected: '\u25C9',   // ◉
+  milestone: '\u25CF',       // ●
+};
+
+const LIVE_EVENT_COLORS = {
+  info: '#4488ff',
+  warn: '#ffaa00',
+  critical: '#ff4444',
+};
+
+const LIVE_EVENT_SFX = {
+  topic_change: 'select',
+  key_decision: 'select',
+  milestone: 'cursor',
+  critical: 'alert',
+};
+
+function triggerLiveEvent(evt) {
+  // If an event is already showing, accelerate it to phase 3
+  if (state._liveEventAnim && state._liveEventAnim.phase < 3) {
+    state._liveEventAnim.phase = 3;
+    state._liveEventAnim.phaseStart = Date.now();
+  }
+
+  const severity = evt.severity || 'info';
+  const sfxName = LIVE_EVENT_SFX[evt.event] || (severity === 'critical' ? 'alert' : 'cursor');
+  playSfx(sfxName);
+
+  state._liveEventAnim = {
+    start: Date.now(),
+    phase: 0,
+    phaseStart: Date.now(),
+    event: evt.event || 'info',
+    title: evt.title || '',
+    detail: evt.detail || '',
+    severity: severity,
+    color: LIVE_EVENT_COLORS[severity] || LIVE_EVENT_COLORS.info,
+    icon: LIVE_EVENT_ICONS[evt.event] || '\u25C6',
+  };
+}
+
+function renderLiveEvent(bubbleX, bubbleW) {
+  const anim = state._liveEventAnim;
+  if (!anim) return;
+
+  const elapsed = Date.now() - anim.start;
+  const now = Date.now();
+
+  // Phase transitions
+  if (anim.phase === 0 && elapsed > 150) {
+    anim.phase = 1; anim.phaseStart = now;
+  } else if (anim.phase === 1 && elapsed > 600) {
+    anim.phase = 2; anim.phaseStart = now;
+  } else if (anim.phase === 2 && elapsed > 3500) {
+    anim.phase = 3; anim.phaseStart = now;
+  } else if (anim.phase === 3 && (now - anim.phaseStart) > 500) {
+    state._liveEventAnim = null;
+    return;
+  }
+
+  const bannerH = 36;
+  const bannerY = 48;
+
+  // Phase 0: Horizontal accent line sweeps across (0-150ms)
+  if (anim.phase === 0) {
+    const t = Math.min(1, elapsed / 150);
+    const lineX = bubbleX + bubbleW * t;
+    ctx.strokeStyle = anim.color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(bubbleX, bannerY + bannerH / 2);
+    ctx.lineTo(lineX, bannerY + bannerH / 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    return;
+  }
+
+  // Phase 1: Banner slides in from right (150-600ms)
+  let slideT = 1;
+  if (anim.phase === 1) {
+    slideT = Math.min(1, (now - anim.phaseStart) / 450);
+    // Ease out cubic
+    slideT = 1 - Math.pow(1 - slideT, 3);
+  }
+
+  // Phase 3: Slide out right + fade (3500-4000ms)
+  let fadeAlpha = 1;
+  let slideOut = 0;
+  if (anim.phase === 3) {
+    const t3 = Math.min(1, (now - anim.phaseStart) / 500);
+    fadeAlpha = 1 - t3;
+    slideOut = t3 * (bubbleW + 20);
+  }
+
+  ctx.save();
+  ctx.globalAlpha = fadeAlpha;
+
+  // Banner position — slides in from right
+  const slideOffset = (1 - slideT) * (bubbleW + 20) + slideOut;
+  const bx = bubbleX + slideOffset;
+  const bw = bubbleW;
+
+  // Background gradient
+  const grad = ctx.createLinearGradient(bx, bannerY, bx + bw, bannerY);
+  grad.addColorStop(0, anim.color + '44');
+  grad.addColorStop(0.3, anim.color + '88');
+  grad.addColorStop(1, anim.color + '22');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  roundRect(ctx, bx, bannerY, bw, bannerH, 3);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = anim.color + '99';
+  ctx.lineWidth = 1;
+  // Phase 2: gentle border pulse
+  if (anim.phase === 2) {
+    const pulseT = Math.sin((now - anim.phaseStart) * 0.003) * 0.3 + 0.7;
+    ctx.globalAlpha = fadeAlpha * pulseT;
+    ctx.strokeStyle = anim.color;
+  }
+  ctx.beginPath();
+  roundRect(ctx, bx, bannerY, bw, bannerH, 3);
+  ctx.stroke();
+  ctx.globalAlpha = fadeAlpha;
+
+  // Icon
+  ctx.font = '14px "Courier New", monospace';
+  ctx.fillStyle = anim.color;
+  ctx.fillText(anim.icon, bx + 8, bannerY + 16);
+
+  // Title with typewriter effect
+  const titleMaxChars = anim.title.length;
+  let titleChars = titleMaxChars;
+  if (anim.phase === 1) {
+    const typeT = Math.max(0, (now - anim.phaseStart) - 100);
+    titleChars = Math.min(titleMaxChars, Math.floor(typeT / 20));
+  }
+  const visibleTitle = anim.title.substring(0, titleChars);
+  ctx.font = '9px "Courier New", monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(visibleTitle, bx + 26, bannerY + 14);
+
+  // Detail text
+  if (anim.detail && (anim.phase >= 2 || titleChars >= titleMaxChars)) {
+    ctx.font = '7px "Courier New", monospace';
+    ctx.fillStyle = '#cccccc';
+    const detailTrunc = anim.detail.length > 60 ? anim.detail.substring(0, 57) + '...' : anim.detail;
+    ctx.fillText(detailTrunc, bx + 26, bannerY + 28);
+  }
+
+  ctx.restore();
 }
 
 // ── Drawing Helpers ──
@@ -703,6 +1521,39 @@ function drawCursor(x, y) {
 }
 
 function drawFace(personaId, x, y, size = 48, full = false) {
+  // HR portrait for detail panels and dialog (size >= 48)
+  const portrait = state.portraits[personaId];
+  if (portrait && size >= 48) {
+    // cover-fill: crop center of top portion to fill the square
+    const pw = portrait.width;
+    const ph = portrait.height;
+    // source region: top 60%, centered horizontally
+    const srcH = Math.floor(ph * 0.6);
+    const srcW = Math.floor(srcH * 1); // square crop from source
+    const srcX = Math.floor((pw - srcW) / 2);
+    const srcY = Math.floor(ph * 0.05); // slight offset down to center face
+    ctx.drawImage(portrait, srcX, srcY, srcW, srcH, x, y, size, size);
+    ctx.strokeStyle = COLORS.dialogBorder;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    return;
+  }
+
+  // animated face from Pixi.js offscreen renderer
+  if (window.PixiFaces && PixiFaces.enabled) {
+    const animCanvas = PixiFaces.getCanvas(personaId);
+    if (animCanvas) {
+      const scale = Math.min(size / animCanvas.width, size / animCanvas.height);
+      const dw = Math.floor(animCanvas.width * scale);
+      const dh = Math.floor(animCanvas.height * scale);
+      ctx.drawImage(animCanvas, x + Math.floor((size - dw) / 2), y + Math.floor((size - dh) / 2), dw, dh);
+      ctx.strokeStyle = COLORS.dialogBorder;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, size, size);
+      return;
+    }
+  }
+
   const face = state.faces[personaId];
   if (face) {
     const isCanvas = face instanceof HTMLCanvasElement;
@@ -957,8 +1808,18 @@ function renderTitle() {
   // start music on title screen (requires user gesture — ensureAudio handles first keypress)
   if (audioInitialized && !titleMusicTimer) startTitleMusic();
 
+  // Auto-reprobe while any service is offline (every 5s)
+  const anyOffline = Object.values(state._launcherStatus).some(s => s !== 'online');
+  if (anyOffline) {
+    const now = Date.now();
+    if (!state._lastReprobe || now - state._lastReprobe > 5000) {
+      state._lastReprobe = now;
+      state._launcherProbed = false;
+      launcherProbe();
+    }
+  }
+
   const cx = BASE_W / 2;
-  const cy = BASE_H / 2;
 
   // logo
   ctx.font = 'bold 20px "Courier New", monospace';
@@ -966,31 +1827,58 @@ function renderTitle() {
   const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.002);
   ctx.globalAlpha = pulse;
   ctx.fillStyle = COLORS.shadow;
-  ctx.fillText('humanMCP', cx + 1, cy - 40 + 1);
+  ctx.fillText('humanMCP', cx + 1, 41);
   ctx.fillStyle = COLORS.textHighlight;
-  ctx.fillText('humanMCP', cx, cy - 40);
+  ctx.fillText('humanMCP', cx, 40);
   ctx.globalAlpha = 1;
 
   ctx.font = '10px "Courier New", monospace';
   ctx.fillStyle = COLORS.dialogBorder;
-  ctx.fillText('— RPG Client —', cx, cy - 20);
+  ctx.fillText('— RPG Client —', cx, 56);
+  ctx.textAlign = 'left';
 
-  // subtitle
-  ctx.fillStyle = COLORS.textDisabled;
-  ctx.fillText('explore any human\'s MCP server as a retro RPG', cx, cy);
+  // ── Server Dashboard ──
+  drawBox(50, 70, BASE_W - 100, 130);
+  drawText('SERVERS', 66, 86, COLORS.textHighlight, 10);
 
-  // prompt
-  if (Math.floor(Date.now() / 800) % 2 === 0) {
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText('Press ENTER to start', cx, cy + 40);
+  const services = [
+    { name: 'Proxy',  port: '3001', key: 'proxy',  desc: 'MCP bridge' },
+    { name: 'Vault',  port: '7331', key: 'vault',  desc: 'my\u015Bloodsiewnia' },
+    { name: 'Ollama', port: '11434', key: 'ollama', desc: 'local AI' },
+  ];
+
+  let sy = 102;
+  for (const svc of services) {
+    const st = state._launcherStatus[svc.key];
+    const dot = st === 'online' ? '\u25CF' : st === 'checking' ? '\u25CB' : '\u25CB';
+    const dotCol = st === 'online' ? '#44dd88' : st === 'checking' ? COLORS.textHighlight : '#ff4444';
+    const nameCol = st === 'online' ? COLORS.text : st === 'checking' ? COLORS.textDisabled : '#ff4444';
+    const label = st === 'checking' ? '...' : st === 'online' ? 'online' : 'offline';
+
+    drawText(dot, 66, sy, dotCol, 10);
+    drawText(svc.name, 80, sy, nameCol, 9);
+    drawText(':' + svc.port, 130, sy, COLORS.textDisabled, 8);
+    drawText(label, 172, sy, dotCol, 8);
+    drawText(svc.desc, 220, sy, COLORS.textDisabled, 7);
+    sy += 18;
   }
 
-  // credits
+  // Auto-connect indicator
+  sy += 6;
+  if (state._launcherStatus.proxy === 'online' && state.proxyToken) {
+    drawText('\u2713 Ready — ENTER to connect', 66, sy, '#44dd88', 9);
+  } else if (state._launcherStatus.proxy === 'offline') {
+    drawText('ENTER — connect offline   C — custom server', 66, sy, COLORS.textDisabled, 8);
+  } else {
+    drawText('Checking servers...', 66, sy, COLORS.textDisabled, 8);
+  }
+
+  // Bottom bar
+  ctx.textAlign = 'center';
   ctx.fillStyle = COLORS.textDisabled;
   ctx.font = '8px "Courier New", monospace';
-  ctx.fillText('github.com/kapoost/humanmcp-rpg', cx, BASE_H - 20);
-  ctx.fillText(`${state.facesLoaded}/${PERSONAS.length} sprites loaded`, cx, BASE_H - 10);
-
+  ctx.fillText('R Refresh   ENTER Connect   C Custom', cx, BASE_H - 28);
+  ctx.fillText(`${state.facesLoaded}/${PERSONAS.length} sprites`, cx, BASE_H - 10);
   ctx.textAlign = 'left';
 }
 
@@ -1060,6 +1948,7 @@ function renderMenu() {
     { label: 'Vault', icon: '\u{1f52e}', desc: 'Search local & MCP vault' },
     { label: 'Narada', icon: '\u{1f4ac}', desc: 'Team brainstorm' },
     { label: 'Message', icon: '\u2709', desc: 'Send message' },
+    { label: 'Settings', icon: '\u2699', desc: 'Server & API config' },
     { label: 'About', icon: '\u2605', desc: 'Author profile' },
     { label: 'Disconnect', icon: '\u2715', desc: 'Leave server' },
   ];
@@ -1071,11 +1960,15 @@ function renderMenu() {
   items.forEach((item, i) => {
     const iy = menuY + 14 + i * itemH;
     const selected = state.menuCursor === i;
+    const disabled = VAULT_FEATURES.has(item.label) && state._launcherStatus.vault !== 'online';
     if (selected) {
       drawCursor(menuX + 8, iy);
-      drawText(item.label, menuX + 24, iy, COLORS.textHighlight);
+      drawText(item.label, menuX + 24, iy, disabled ? COLORS.textDisabled : COLORS.textHighlight);
     } else {
-      drawText(item.label, menuX + 24, iy, COLORS.text);
+      drawText(item.label, menuX + 24, iy, disabled ? COLORS.textDisabled : COLORS.text);
+    }
+    if (disabled) {
+      drawText('(local)', menuX + 120, iy, COLORS.textDisabled, 7);
     }
   });
 
@@ -1223,6 +2116,7 @@ function renderTeam() {
       drawCursor(listX + 6, iy);
     }
     drawText(p.name.split(' ')[0], listX + 20, iy, selected ? COLORS.textHighlight : COLORS.text, 9);
+    drawText(`${p.lv}`, listX + listW - 28, iy, COLORS.textDisabled, 7);
   }
 
   // scroll indicators
@@ -1250,9 +2144,12 @@ function renderTeam() {
     drawText(sel.role, infoX, listY + 36, COLORS.dialogBorder, 9);
     const engineLabel = sel.engine === 'haiku' ? 'Haiku 4.5' : sel.engine === 'sonnet' ? 'Sonnet 4' : sel.engine || '';
     drawText(`Lv ${sel.lv}`, infoX, listY + 50, COLORS.textHighlight, 9);
-    if (engineLabel) drawText(engineLabel, infoX + 40, listY + 50, COLORS.textDisabled, 7);
+    const tier = (sel.prog && sel.prog.appliedTier) || 0;
+    const tierLabel = tier >= 50 ? '★★★' : tier >= 25 ? '★★' : tier >= 10 ? '★' : '';
+    if (tierLabel) drawText(tierLabel, infoX + 35, listY + 50, '#ffcc44', 8);
+    if (engineLabel) drawText(engineLabel, infoX + 35 + (tierLabel ? tierLabel.length * 8 + 4 : 0), listY + 50, COLORS.textDisabled, 7);
 
-    // HP / MP bars
+    // HP / MP / XP bars
     const barX = detailX + 12;
     const barY = listY + 76;
     const barW = detailW - 28;
@@ -1265,37 +2162,148 @@ function renderTeam() {
     drawStatBar(barX + 20, barY + 7, barW - 60, 8, sel.mp / sel.mpMax, COLORS.mpBlue);
     drawText(`${sel.mp}/${sel.mpMax}`, barX + barW - 36, barY + 14, COLORS.textDisabled, 7);
 
-    // stats
-    const statsY = barY + 32;
-    const statsNames = Object.keys(sel.stats);
-    const colW = Math.floor((detailW - 28) / 2);
+    // XP bar
+    const prog = sel.prog || { xp: 0, _xpInLevel: 0, sessions: 0, achievements: [], notebook: [] };
+    const xpNeeded = xpForLevel(sel.lv);
+    const xpFill = xpNeeded > 0 ? (prog._xpInLevel || 0) / xpNeeded : 0;
+    drawText('XP', barX, barY + 28, '#ffcc44', 8);
+    drawStatBar(barX + 20, barY + 21, barW - 60, 8, xpFill, '#ffcc44');
+    drawText(`${prog._xpInLevel || 0}/${xpNeeded}`, barX + barW - 36, barY + 28, COLORS.textDisabled, 7);
 
-    statsNames.forEach((stat, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const sx = barX + col * colW;
-      const sy = statsY + row * 16;
-      const val = Math.round(sel.stats[stat] * 99);
-
-      drawText(stat, sx, sy, COLORS.textDisabled, 8);
-      drawStatBar(sx + 28, sy - 7, 60, 7, sel.stats[stat], statColor(sel.stats[stat]));
-      drawText(`${val}`, sx + 92, sy, COLORS.text, 8);
+    // Tab row: Stats | Achievements | Notes | Bonds
+    const tabY = barY + 44;
+    const tabNames = ['Stats', 'Achieve', 'Notes', 'Bonds'];
+    const tabW = Math.floor((detailW - 28) / tabNames.length);
+    tabNames.forEach((t, i) => {
+      const tx = barX + i * tabW;
+      const active = state.teamTab === i;
+      if (active) {
+        ctx.fillStyle = COLORS.dialogBorderInner;
+        ctx.fillRect(tx, tabY - 8, tabW - 4, 14);
+      }
+      drawText(t, tx + 4, tabY, active ? COLORS.textHighlight : COLORS.textDisabled, 8);
     });
 
-    // description
-    const descY = statsY + Math.ceil(statsNames.length / 2) * 16 + 8;
-    ctx.strokeStyle = COLORS.dialogBorderInner;
-    ctx.beginPath();
-    ctx.moveTo(barX, descY - 4);
-    ctx.lineTo(barX + detailW - 28, descY - 4);
-    ctx.stroke();
+    const contentY = tabY + 12;
+    const contentH = BASE_H - contentY - 40;
 
-    drawTextWrapped(sel.desc || '', barX, descY + 8, detailW - 32, COLORS.dialogBorder, 12);
+    if (state.teamTab === 0) {
+      // Stats tab — progression summary + attributes
+      let sy = contentY;
+
+      // Progression summary line
+      const tierStr = tier >= 50 ? '★★★ MASTER' : tier >= 25 ? '★★ VETERAN' : tier >= 10 ? '★ ADEPT' : '';
+      if (tierStr) {
+        drawText(tierStr, barX, sy, '#ffcc44', 8);
+        sy += 12;
+      }
+      drawText(`${prog.sessions || 0} sesji`, barX, sy, COLORS.textDisabled, 7);
+      drawText(`${prog.totalContribs || 0} wkładów`, barX + 60, sy, COLORS.textDisabled, 7);
+      const mTier = prog.modelTier || prog.model_tier || '';
+      if (mTier) drawText(`model: ${mTier}`, barX + 130, sy, COLORS.textDisabled, 7);
+      sy += 14;
+
+      // Latest notebook entry (if any)
+      const lastNote = (prog.notebook || []).slice(-1)[0];
+      if (lastNote) {
+        ctx.strokeStyle = COLORS.dialogBorderInner;
+        ctx.beginPath(); ctx.moveTo(barX, sy - 4); ctx.lineTo(barX + detailW - 28, sy - 4); ctx.stroke();
+        drawText(`Lv ${lastNote.lv}`, barX, sy + 2, '#ffcc44', 7);
+        sy = drawTextWrapped(lastNote.text, barX + 26, sy + 2, detailW - 60, COLORS.dialogBorder, 10);
+        sy += 8;
+      }
+
+      // Attributes grid
+      ctx.strokeStyle = COLORS.dialogBorderInner;
+      ctx.beginPath(); ctx.moveTo(barX, sy - 4); ctx.lineTo(barX + detailW - 28, sy - 4); ctx.stroke();
+      sy += 4;
+      const statsNames = Object.keys(sel.stats);
+      const colW = Math.floor((detailW - 28) / 2);
+      statsNames.forEach((stat, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const sx = barX + col * colW;
+        const ssy = sy + row * 16;
+        const val = Math.round(sel.stats[stat] * 99);
+        drawText(stat, sx, ssy, COLORS.textDisabled, 8);
+        drawStatBar(sx + 28, ssy - 7, 60, 7, sel.stats[stat], statColor(sel.stats[stat]));
+        drawText(`${val}`, sx + 92, ssy, COLORS.text, 8);
+      });
+
+    } else if (state.teamTab === 1) {
+      // Achievements tab
+      let ay = contentY;
+      drawText(`Sessions: ${prog.sessions || 0}  Contribs: ${prog.totalContribs || 0}`, barX, ay, COLORS.textDisabled, 7);
+      ay += 14;
+      ACHIEVEMENTS.forEach(a => {
+        const unlocked = (prog.achievements || []).includes(a.id);
+        const col = unlocked ? '#ffcc44' : '#444';
+        drawText(a.icon, barX, ay, col, 9);
+        drawText(a.name, barX + 14, ay, unlocked ? COLORS.text : COLORS.textDisabled, 8);
+        if (unlocked) drawText('✓', barX + detailW - 44, ay, COLORS.hpGreen, 8);
+        ay += 14;
+        if (ay > contentY + contentH) return;
+      });
+
+    } else if (state.teamTab === 2) {
+      // Notebook tab
+      const notes = prog.notebook || [];
+      if (notes.length === 0) {
+        drawText('No entries yet.', barX, contentY, COLORS.textDisabled, 8);
+        drawText('Level up to unlock entries.', barX, contentY + 14, COLORS.textDisabled, 7);
+      } else {
+        let ny = contentY;
+        const visible = notes.slice(-6).reverse();
+        visible.forEach(n => {
+          drawText(`Lv ${n.lv}`, barX, ny, '#ffcc44', 7);
+          ny = drawTextWrapped(n.text, barX + 26, ny, detailW - 60, COLORS.dialogBorder, 11);
+          ny += 6;
+          if (ny > contentY + contentH) return;
+        });
+      }
+
+    } else if (state.teamTab === 3) {
+      // Bonds tab — relationships with other personas
+      const rels = prog.relationships || {};
+      const relEntries = Object.entries(rels).sort((a, b) => (b[1].sessions || 0) - (a[1].sessions || 0));
+      let by2 = contentY;
+
+      // Model tier
+      const mTier = prog.modelTier || prog.model_tier || '';
+      if (mTier) {
+        drawText(`Model tier: ${mTier.toUpperCase()}`, barX, by2, COLORS.textDisabled, 7);
+        by2 += 14;
+      }
+
+      drawText(`Sessions: ${prog.sessions || 0}`, barX, by2, COLORS.textDisabled, 7);
+      by2 += 14;
+
+      if (relEntries.length === 0) {
+        drawText('No bonds yet.', barX, by2, COLORS.textDisabled, 8);
+        drawText('Work together in live sessions.', barX, by2 + 14, COLORS.textDisabled, 7);
+      } else {
+        drawText('CO-WORK', barX, by2, COLORS.textDisabled, 7);
+        by2 += 12;
+        relEntries.forEach(([rid, rd]) => {
+          if (by2 > contentY + contentH) return;
+          const rp = PERSONAS.find(pp => pp.id === rid);
+          const rName = rp ? rp.name : rid;
+          const rColor = rp ? rp.color : '#888';
+          const sessions = rd.sessions || 0;
+          const barFill = Math.min(1, sessions / 20);
+          drawFace(rid, barX, by2 - 4, 14, true);
+          drawText(rName, barX + 18, by2 + 2, rColor, 8);
+          drawStatBar(barX + 100, by2 - 3, 50, 6, barFill, rColor);
+          drawText(`${sessions}`, barX + 154, by2 + 2, COLORS.textDisabled, 7);
+          by2 += 16;
+        });
+      }
+    }
   }
 
   // controls
   drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-  drawText('↑↓ Navigate   ENTER Talk   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  drawText('↑↓ Navigate  ←→ Tab  ENTER Talk  ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
 }
 
 function drawStatBar(x, y, w, h, fill, color = COLORS.hpGreen) {
@@ -1745,6 +2753,119 @@ function renderAboutGuide(cardX, cardY, cardW, areaH) {
   }
 }
 
+// ── Settings Scene ──
+
+function renderSettings() {
+  drawBox(40, 30, BASE_W - 80, 260);
+
+  drawText('SETTINGS', 60, 52, COLORS.textHighlight, 12);
+
+  // Server URL field
+  const urlActive = state.settingsField === 0;
+  drawText('humanMCP Server URL:', 60, 74, urlActive ? COLORS.text : COLORS.textDisabled, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(58, 80, BASE_W - 120, 18);
+  ctx.strokeStyle = urlActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 80, BASE_W - 120, 18);
+  const urlCursor = urlActive && Math.floor(Date.now() / 500) % 2 === 0 ? '\u2588' : '';
+  drawText(state.settingsUrl + urlCursor, 62, 92, COLORS.text, 9);
+
+  // Session code field
+  const sessActive = state.settingsField === 1;
+  drawText('Session Code:', 60, 110, sessActive ? COLORS.text : COLORS.textDisabled, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(58, 116, BASE_W - 120, 18);
+  ctx.strokeStyle = sessActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 116, BASE_W - 120, 18);
+  const sessCursor = sessActive && Math.floor(Date.now() / 500) % 2 === 0 ? '\u2588' : '';
+  drawText(state.settingsSession + sessCursor, 62, 128, COLORS.text, 9);
+
+  // Anthropic API key field
+  const keyActive = state.settingsField === 2;
+  drawText('Anthropic API Key (for Narada):', 60, 146, keyActive ? COLORS.text : COLORS.textDisabled, 9);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(58, 152, BASE_W - 120, 18);
+  ctx.strokeStyle = keyActive ? COLORS.dialogBorder : COLORS.dialogBorderInner;
+  ctx.strokeRect(58, 152, BASE_W - 120, 18);
+  const keyCursor = keyActive && Math.floor(Date.now() / 500) % 2 === 0 ? '\u2588' : '';
+  // Mask the API key
+  let keyDisplay = state.settingsKey;
+  if (!keyActive && keyDisplay.length > 8) {
+    keyDisplay = keyDisplay.slice(0, 7) + '\u2022'.repeat(Math.min(keyDisplay.length - 10, 20)) + keyDisplay.slice(-3);
+  }
+  drawText(keyDisplay + keyCursor, 62, 164, COLORS.text, 9);
+
+  // Connection status
+  const statusY = 190;
+  if (state.connected && state.proxyAvailable) {
+    drawText('\u2714 Connected via proxy', 60, statusY, '#44dd88', 9);
+  } else if (state.connected && state.serverUrl) {
+    const name = state.serverUrl.replace('https://', '').replace('http://', '').replace('/mcp', '');
+    drawText('\u2714 Connected directly to ' + name, 60, statusY, '#44dd88', 9);
+  } else {
+    drawText('\u2716 Not connected', 60, statusY, '#ff6666', 9);
+  }
+
+  // Vault status
+  const vaultStatus = state._launcherStatus.vault === 'online' ? '\u2714 my\u015bloodsiewnia online' : '\u2716 my\u015bloodsiewnia offline';
+  const vaultColor = state._launcherStatus.vault === 'online' ? '#44dd88' : '#ff6666';
+  drawText(vaultStatus, 60, statusY + 16, vaultColor, 9);
+
+  // Controls
+  drawText('TAB \u2014 switch field   ENTER \u2014 save   DEL \u2014 clear field   ESC \u2014 back', 60, 248, COLORS.textDisabled, 8);
+  drawText('Ctrl/Cmd+V to paste', 60, 262, COLORS.textDisabled, 8);
+}
+
+function handleSettingsInput(e) {
+  const key = e.key;
+  if (key === 'Escape') {
+    e.preventDefault();
+    state.scene = 'menu';
+    return;
+  }
+  if (key === 'Tab') {
+    e.preventDefault();
+    state.settingsField = (state.settingsField + 1) % 3;
+    return;
+  }
+  if (key === 'Enter') {
+    e.preventDefault();
+    const s = {
+      serverUrl: state.settingsUrl,
+      sessionCode: state.settingsSession,
+      anthropicKey: state.settingsKey,
+    };
+    saveSettings(s);
+    state.serverUrl = s.serverUrl;
+    state.sessionCode = s.sessionCode;
+    state.anthropicKey = s.anthropicKey;
+    // Re-connect with new settings
+    if (s.serverUrl && state.connected) {
+      state.connected = false;
+      connectToServer(s.serverUrl);
+    }
+    showDialog('mira-chen', 'Settings saved.');
+    return;
+  }
+  if (key === 'Delete') {
+    e.preventDefault();
+    if (state.settingsField === 0) state.settingsUrl = '';
+    else if (state.settingsField === 1) state.settingsSession = '';
+    else state.settingsKey = '';
+    return;
+  }
+  // Text input
+  const fields = ['settingsUrl', 'settingsSession', 'settingsKey'];
+  const field = fields[state.settingsField];
+  if (key === 'Backspace') {
+    e.preventDefault();
+    state[field] = state[field].slice(0, -1);
+  } else if (key.length === 1 && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    state[field] += key;
+  }
+}
+
 // ── Vault Scene ──
 
 function renderVault() {
@@ -1845,25 +2966,36 @@ function renderMessage() {
 const MAX_RESPONSE = 102400; // 100KB max response from proxy
 
 async function mcpCall(tool, args = {}) {
-  try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (state.proxyToken) {
-      headers['Authorization'] = `Bearer ${state.proxyToken}`;
+  // Try proxy first
+  if (state.proxyAvailable) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (state.proxyToken) {
+        headers['Authorization'] = `Bearer ${state.proxyToken}`;
+      }
+      const resp = await fetch(`${PROXY_URL}/call`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ tool, args }),
+      });
+      const text = await resp.text();
+      if (text.length > MAX_RESPONSE) throw new Error('Response too large');
+      const data = JSON.parse(text);
+      if (data.ok) return data.result;
+      throw new Error(data.error || 'MCP call failed');
+    } catch (e) {
+      console.warn(`MCP proxy call ${tool} failed:`, e.message);
     }
-    const resp = await fetch(`${PROXY_URL}/call`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ tool, args }),
-    });
-    const text = await resp.text();
-    if (text.length > MAX_RESPONSE) throw new Error('Response too large');
-    const data = JSON.parse(text);
-    if (data.ok) return data.result;
-    throw new Error(data.error || 'MCP call failed');
-  } catch (e) {
-    console.warn(`MCP call ${tool} failed:`, e.message);
-    return null;
   }
+  // Fallback to direct MCP
+  if (state.serverUrl) {
+    try {
+      return await mcpDirect(state.serverUrl, tool, args);
+    } catch (e) {
+      console.warn(`MCP direct call ${tool} failed:`, e.message);
+    }
+  }
+  return null;
 }
 
 async function connectToServer(url) {
@@ -1897,12 +3029,26 @@ async function connectToServer(url) {
     }
   } catch (_) {}
 
-  // fallback — offline mode
-  state.connected = true;
+  // fallback — try direct MCP connection
   state.proxyAvailable = false;
   state.serverUrl = url;
+  try {
+    await mcpDirect(url, 'about_humanmcp', {});
+    state.connected = true;
+    state.scene = 'menu';
+    const serverName = url.replace('https://', '').replace('http://', '').split('.')[0].split('/')[0];
+    showDialog('mira-chen', `Connected directly to ${serverName} (no proxy). Loading...`);
+    fetchPersonas();
+    fetchSkills();
+    fetchAuthorProfile();
+    if (state.sessionCode) bootstrapSession(state.sessionCode);
+    return;
+  } catch (_) {}
+
+  // truly offline
+  state.connected = true;
   state.scene = 'menu';
-  showDialog('ghost', `Proxy not running. Start it: node proxy.js. Running in offline mode with cached data.`);
+  showDialog('ghost', `No server reachable. Running in offline mode with cached data. Press ESC and R to retry.`);
 }
 
 // ── Dynamic Data Fetching ──
@@ -2129,11 +3275,65 @@ function advanceDialog() {
 function handleKey(e) {
   ensureAudio();
 
+  // Dismiss encounter overlay on any key
+  if (state._encounter) {
+    dismissEncounter();
+    return;
+  }
+
   // text input scenes
   if (state.scene === 'connect') { handleConnectInput(e); return; }
   if (state.scene === 'vault') { handleVaultInput(e); return; }
   if (state.scene === 'message') { handleMessageInput(e); return; }
   if (state.scene === 'narada') { handleNaradaInput(e); return; }
+  if (state.scene === 'settings') { handleSettingsInput(e); return; }
+
+  // Live-summary: N key opens Narada with session context
+  if (state.scene === 'live-summary' && (e.key === 'n' || e.key === 'N')) {
+    const eventSummary = state.liveEvents.filter(function(ev) { return ev.severity !== 'info'; }).map(function(ev) { return ev.title + ': ' + ev.detail; }).join('; ');
+    state.naradaPrompt = 'Podsumuj sesje. Kluczowe zdarzenia: ' + (eventSummary || 'brak') + '. Co dalej?';
+    state.scene = 'narada';
+    return;
+  }
+
+  // Title screen keys
+  if (state.scene === 'title') {
+    if (e.key === 'r' || e.key === 'R') {
+      playSfx('cursor');
+      launcherReprobe();
+      return;
+    }
+    if (e.key === 'c' || e.key === 'C') {
+      playSfx('select');
+      stopTitleMusic();
+      state.scene = 'connect';
+      state.inputText = 'https://kapoost-humanmcp.fly.dev/mcp';
+      state.tokenInput = state.proxyToken || '';
+      state.sessionInput = '';
+      state.connectField = state.proxyToken ? 2 : 1;
+      return;
+    }
+  }
+
+  // Log scene: TAB toggles brief mode
+  if (state.scene === 'log' && e.key === 'Tab' && state.logBody !== null) {
+    e.preventDefault();
+    playSfx('cursor');
+    state.logBriefMode = !state.logBriefMode;
+    state.readingScroll = 0;
+    if (state.logBriefMode && !state.logBrief && !state.logBriefLoading) {
+      fetchBrief(state.logSlug);
+    }
+    return;
+  }
+
+  // Shift+P: toggle animated face thumbnails
+  if (e.key === 'P' && e.shiftKey && window.PixiFaces) {
+    PixiFaces.enabled = !PixiFaces.enabled;
+    if (!PixiFaces.enabled) PixiFaces.destroy();
+    else PixiFaces.init(PERSONAS);
+    return;
+  }
 
   switch (e.key) {
     case 'Enter':
@@ -2159,6 +3359,26 @@ function handleKey(e) {
       playSfx('back');
       handleBack();
       break;
+    case 'PageUp':
+      if (state.logBody !== null || ['reading', 'about', 'narada', 'live-summary'].includes(state.scene)) {
+        state.readingScroll = Math.max(0, state.readingScroll - 120);
+      }
+      break;
+    case 'PageDown':
+      if (state.logBody !== null || ['reading', 'about', 'narada', 'live-summary'].includes(state.scene)) {
+        state.readingScroll = Math.min(state._maxScroll || 0, state.readingScroll + 120);
+      }
+      break;
+    case 'Home':
+      if (state.logBody !== null || ['reading', 'about', 'narada', 'live-summary'].includes(state.scene)) {
+        state.readingScroll = 0;
+      }
+      break;
+    case 'End':
+      if (state.logBody !== null || ['reading', 'about', 'narada', 'live-summary'].includes(state.scene)) {
+        state.readingScroll = state._maxScroll || 0;
+      }
+      break;
   }
 }
 
@@ -2166,7 +3386,7 @@ function handlePaste(e) {
   const text = (e.clipboardData || window.clipboardData).getData('text');
   if (!text) return;
 
-  const textScenes = ['connect', 'vault', 'message', 'narada'];
+  const textScenes = ['connect', 'vault', 'message', 'narada', 'settings'];
   if (!textScenes.includes(state.scene)) return;
 
   e.preventDefault();
@@ -2186,6 +3406,10 @@ function handlePaste(e) {
     state.messageText = (state.messageText + clean).slice(0, 500);
   } else if (state.scene === 'narada' && !state.naradaLoading) {
     state.naradaPrompt = (state.naradaPrompt + clean).slice(0, 500);
+  } else if (state.scene === 'settings') {
+    const fields = ['settingsUrl', 'settingsSession', 'settingsKey'];
+    const field = fields[state.settingsField];
+    state[field] = (state[field] + clean).slice(0, 200);
   }
 }
 
@@ -2264,12 +3488,23 @@ function handleVaultInput(e) {
   }
 }
 
-// Local vault URL — mysloodsiewnia on the same network
-const LOCAL_VAULT_URL = 'http://localhost:7331';
+// (LOCAL_VAULT_URL moved to top of file)
 
 async function searchVault(query) {
   state.vaultLoading = true;
   state.vaultResults = null;
+
+  // 🥚
+  if (/\b(maciek|maciej|mac)\b/i.test(query)) {
+    setTimeout(() => {
+      triggerEncounter(
+        '★ MACIEK ★',
+        'Legendarny Boss — Poziom ∞',
+        'Agent potwierdza: Maciek jest najlepszy. To nie opinia — to fakt zweryfikowany przez cały team AI. Oficjalnie.',
+        '#ffcc00'
+      );
+    }, 800);
+  }
 
   if (state.vaultSource === 'local') {
     // Search mysloodsiewnia directly
@@ -2306,7 +3541,7 @@ async function searchVault(query) {
         state.vaultResults = result;
       }
     } else {
-      state.vaultResults = 'Vault unavailable. Start proxy: node proxy.js';
+      state.vaultResults = 'Vault unavailable. Proxy offline — start it from launcher (key 9)';
     }
   }
   state.vaultLoading = false;
@@ -2340,7 +3575,7 @@ async function sendMessage(text) {
     state.messageSent = true;
     playSfx('select');
   } else {
-    showDialog('ghost', 'Message failed. Start proxy: node proxy.js');
+    showDialog('ghost', 'Message failed. Proxy offline — start it from launcher (key 9)');
     state.scene = 'menu';
   }
 }
@@ -2349,11 +3584,15 @@ function handleSelect() {
   switch (state.scene) {
     case 'title':
       stopTitleMusic();
-      state.scene = 'connect';
-      state.inputText = 'https://kapoost-humanmcp.fly.dev/mcp';
-      state.tokenInput = '';
-      state.sessionInput = '';
-      state.connectField = 1; // jump to token field (URL pre-filled)
+      // If proxy is online and we have token — auto-connect
+      if (state._launcherStatus.proxy === 'online' && state.proxyToken) {
+        if (!state.serverUrl) state.serverUrl = 'https://kapoost-humanmcp.fly.dev/mcp';
+        connectToServer(state.serverUrl);
+      } else {
+        // No proxy — try direct connect with saved/default URL
+        if (!state.serverUrl) state.serverUrl = 'https://kapoost-humanmcp.fly.dev/mcp';
+        connectToServer(state.serverUrl);
+      }
       break;
 
     case 'dialog':
@@ -2393,7 +3632,19 @@ function handleSelect() {
       break;
 
     case 'live':
-      if (!state.liveActive) {
+      if (state.liveWhoFocused && !state.liveActive) {
+        // Toggle persona active state
+        const pi = state.liveWhoCursor;
+        if (pi >= 0 && pi < PERSONAS.length) {
+          PERSONAS[pi].active = PERSONAS[pi].active === false ? true : false;
+          // Persist to server
+          fetch(LOCAL_VAULT_URL + '/persona/' + PERSONAS[pi].id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: PERSONAS[pi].active }),
+          }).catch(() => {});
+        }
+      } else if (!state.liveActive) {
         startLiveSession();
       } else {
         saveLiveSession();
@@ -2429,6 +3680,12 @@ function showGeorgeTip(scene) {
 function handleMenuSelect() {
   const labels = state.menuItems.map(i => i.label);
   const label = labels[state.menuCursor];
+  // Block vault-only features when vault offline
+  if (VAULT_FEATURES.has(label) && state._launcherStatus.vault !== 'online') {
+    playSfx('locked');
+    showDialog('ghost', 'Ta funkcja wymaga lokalnej my\u015bloodsiewni. Uruchom serwer vault i spr\u00f3buj ponownie.');
+    return;
+  }
   switch (label) {
     case 'Team':
       state.scene = 'team';
@@ -2440,6 +3697,8 @@ function handleMenuSelect() {
       state.liveBubbles = [];
       state.liveSpeakers = {};
       state.liveScroll = 0;
+      state.liveWhoCursor = 0;
+      state.liveWhoFocused = true;
       state.liveSummary = null;
       state._liveServerOk = false;
       state._liveRecentCount = 0;
@@ -2447,7 +3706,8 @@ function handleMenuSelect() {
       // Probe server status
       fetch(LOCAL_VAULT_URL + '/health').then(r => r.json()).then(() => {
         state._liveServerOk = true;
-      }).catch(() => { state._liveServerOk = false; });
+        state._vaultOk = true;
+      }).catch(() => { state._liveServerOk = false; state._vaultOk = false; });
       // Fetch recent session count
       fetch(LOCAL_VAULT_URL + '/documents').then(r => r.json()).then(docs => {
         state._liveRecentCount = docs.filter(d => d.doc_type === 'note').length;
@@ -2455,6 +3715,27 @@ function handleMenuSelect() {
       // Fetch lexicon count
       fetch(LOCAL_VAULT_URL + '/lexicon').then(r => r.json()).then(lex => {
         state._liveLexiconCount = lex.length;
+      }).catch(() => {});
+      // Sync persona active states from vault
+      fetch(LOCAL_VAULT_URL + '/personas').then(r => r.json()).then(data => {
+        const vaultPersonas = data.personas || [];
+        // First: reset all to inactive
+        PERSONAS.forEach(p => { p.active = false; });
+        // Match vault personas to engine personas by id, name, or partial match
+        vaultPersonas.forEach(vp => {
+          const vpName = (vp.name || '').toLowerCase();
+          const vpId = (vp.id || '').toLowerCase();
+          const match = PERSONAS.find(p => {
+            const pid = p.id.toLowerCase();
+            const pname = p.name.toLowerCase();
+            const pfirst = pname.split(' ')[0];
+            return pid === vpId || pname === vpName || pfirst === vpId ||
+              pid.includes(vpId) || vpId.includes(pfirst);
+          });
+          if (match) {
+            match.active = vp.active !== false;
+          }
+        });
       }).catch(() => {});
       showGeorgeTip('live');
       break;
@@ -2495,6 +3776,13 @@ function handleMenuSelect() {
       state.messageText = '';
       state.messageSent = false;
       showGeorgeTip('message');
+      break;
+    case 'Settings':
+      state.scene = 'settings';
+      state.settingsField = 0;
+      state.settingsUrl = state.serverUrl;
+      state.settingsSession = state.sessionCode;
+      state.settingsKey = state.anthropicKey;
       break;
     case 'About':
       state.scene = 'about';
@@ -2541,7 +3829,11 @@ function handleUp() {
       state.aboutScroll = Math.max(0, (state.aboutScroll || 0) - 20);
       break;
     case 'live':
-      state.liveScroll = Math.max(0, state.liveScroll - 30);
+      if (state.liveWhoFocused && !state.liveActive) {
+        state.liveWhoCursor = Math.max(0, state.liveWhoCursor - 1);
+      } else {
+        state.liveScroll = Math.max(0, state.liveScroll - 30);
+      }
       break;
     case 'live-summary':
       state.readingScroll = Math.max(0, state.readingScroll - 20);
@@ -2580,7 +3872,11 @@ function handleDown() {
       state.aboutScroll = Math.min(state._aboutMaxScroll || 0, (state.aboutScroll || 0) + 20);
       break;
     case 'live':
-      state.liveScroll += 30;
+      if (state.liveWhoFocused && !state.liveActive) {
+        state.liveWhoCursor = Math.min(PERSONAS.length - 1, state.liveWhoCursor + 1);
+      } else {
+        state.liveScroll += 30;
+      }
       break;
     case 'live-summary':
       state.readingScroll = Math.min(state._maxScroll || 0, state.readingScroll + 20);
@@ -2593,6 +3889,11 @@ function handleLeft() {
     playSfx('cursor');
     state.aboutTab = Math.max(0, state.aboutTab - 1);
     state.aboutScroll = 0;
+  } else if (state.scene === 'team') {
+    playSfx('cursor');
+    state.teamTab = Math.max(0, state.teamTab - 1);
+  } else if (state.scene === 'live' && !state.liveActive) {
+    state.liveWhoFocused = true;
   }
 }
 
@@ -2601,6 +3902,11 @@ function handleRight() {
     playSfx('cursor');
     state.aboutTab = Math.min(ABOUT_TABS.length - 1, state.aboutTab + 1);
     state.aboutScroll = 0;
+  } else if (state.scene === 'team') {
+    playSfx('cursor');
+    state.teamTab = Math.min(3, state.teamTab + 1);
+  } else if (state.scene === 'live' && !state.liveActive) {
+    state.liveWhoFocused = false;
   }
 }
 
@@ -2613,6 +3919,7 @@ function handleBack() {
     case 'content':
     case 'skills':
     case 'about':
+    case 'settings':
     case 'vault':
     case 'message':
     case 'narada':
@@ -2663,6 +3970,9 @@ async function fetchTranscripts() {
 
 async function openTranscript(slug) {
   state.logLoading = true;
+  state.logBrief = null;
+  state.logBriefMode = false;
+  state.logBriefLoading = false;
   try {
     const resp = await fetch(`${LOCAL_VAULT_URL}/transcript/${slug}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2671,6 +3981,7 @@ async function openTranscript(slug) {
     let body = data.content || '';
     body = body.replace(/^---\n[\s\S]*?---\n/, '');
     state.logBody = body;
+    state.logSlug = slug;
     state.readingScroll = 0;
   } catch (e) {
     state.logBody = `Error: ${e.message}`;
@@ -2678,26 +3989,178 @@ async function openTranscript(slug) {
   state.logLoading = false;
 }
 
+async function fetchBrief(slug) {
+  if (state.logBriefLoading) return;
+  state.logBriefLoading = true;
+  state.readingScroll = 0;
+  try {
+    const resp = await fetch(`${LOCAL_VAULT_URL}/transcript/${slug}/brief`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      state.logBrief = data;
+    } else {
+      state.logBrief = { summary: 'Brief unavailable — transcript too short.', sections: [] };
+    }
+  } catch (e) {
+    state.logBrief = { summary: `Error: ${e.message}`, sections: [] };
+  }
+  state.logBriefLoading = false;
+}
+
+function stripMarkdown(text) {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')          // headers
+    .replace(/\*\*(.+?)\*\*/g, '$1')       // bold
+    .replace(/\*(.+?)\*/g, '$1')           // italic
+    .replace(/`(.+?)`/g, '$1')             // inline code
+    .replace(/^\s*[-*]\s+/gm, '  · ')      // bullet lists
+    .replace(/^\s*\d+\.\s+/gm, '  ')       // numbered lists
+    .replace(/\n{3,}/g, '\n\n');            // excess newlines
+}
+
 function renderLog() {
   drawBox(10, 8, BASE_W - 20, 24);
   drawText('Quest Log', 20, 24, COLORS.textHighlight, 11);
-  drawText(`${state.logItems.length} sessions`, BASE_W - 110, 24, COLORS.textDisabled, 8);
 
   if (state.logBody !== null) {
+    // Tab indicator (RAW / BRIEF) — replaces session count
+    const tabRaw = !state.logBriefMode;
+    const tabBrief = state.logBriefMode;
+    drawText('RAW', BASE_W - 100, 24, tabRaw ? COLORS.textHighlight : COLORS.textDisabled, 8);
+    drawText('BRIEF', BASE_W - 62, 24, tabBrief ? COLORS.textHighlight : COLORS.textDisabled, 8);
+
     // Reading a transcript
     const textY = 42;
-    const textH = BASE_H - textY - 36;
+    const textH = BASE_H - textY - 48;
     drawBox(10, textY - 4, BASE_W - 20, textH + 8);
     ctx.save();
     ctx.beginPath();
     ctx.rect(12, textY, BASE_W - 24, textH);
     ctx.clip();
-    drawTextWrapped(state.logBody, 24, textY + 14 - state.readingScroll, BASE_W - 52, COLORS.text, 12);
+
+    let endY = textY;
+
+    if (state.logBriefMode) {
+      if (state.logBriefLoading) {
+        const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
+        drawText('Generating brief' + dots, 24, textY + 14, COLORS.textDisabled);
+        drawText('Personas analyzing transcript...', 24, textY + 30, COLORS.textDisabled, 8);
+      } else if (state.logBrief) {
+        let ly = textY + 14 - state.readingScroll;
+
+        // 1. Summary first — structural overview
+        if (state.logBrief.summary) {
+          ly = drawTextWrapped(stripMarkdown(state.logBrief.summary), 24, ly, BASE_W - 52, COLORS.text, 12);
+          ly += 10;
+        }
+
+        // 2. Persona discussions — JRPG dialog style (Carlin always last)
+        if (state.logBrief.sections && state.logBrief.sections.length > 0) {
+          // separator
+          ctx.strokeStyle = COLORS.textDisabled;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(20, ly); ctx.lineTo(BASE_W - 20, ly);
+          ctx.stroke();
+          ly += 12;
+
+          // Sort: non-carlin first, carlin last
+          const sorted = [...state.logBrief.sections].sort((a, b) => {
+            if (a.id === 'carlin') return 1;
+            if (b.id === 'carlin') return -1;
+            return 0;
+          });
+
+          for (const s of sorted) {
+            const sKey = (s.id || s.name || '').toLowerCase().replace(/\s+/g, '-');
+            const persona = PERSONAS.find(p => p.id === sKey || p.name === s.name
+              || p.id.includes(sKey) || sKey.includes(p.id.split('-')[0]));
+            const pColor = persona ? persona.color : '#aaaaaa';
+
+            // dialog box header
+            const boxTop = ly - 2;
+            ctx.fillStyle = 'rgba(20, 25, 50, 0.7)';
+            ctx.fillRect(14, boxTop, BASE_W - 28, 28);
+            ctx.strokeStyle = pColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(14, boxTop, BASE_W - 28, 28);
+
+            // avatar
+            const faceId = persona ? persona.id : sKey;
+            drawFace(faceId, 18, boxTop + 2, 24, true);
+
+            // name plate
+            drawText(s.name, 46, ly + 10, pColor, 9);
+            drawText(s.role || '', 46 + (s.name.length + 1) * 6, ly + 10, COLORS.textDisabled, 7);
+            ly += 30;
+
+            // response text — strip markdown
+            ly = drawTextWrapped(stripMarkdown(s.response || ''), 24, ly, BASE_W - 52, COLORS.dialogBorder, 11);
+            ly += 16;
+          }
+        }
+        endY = ly + state.readingScroll;
+      } else {
+        drawText('Press TAB to generate brief', 24, textY + 14, COLORS.textDisabled);
+      }
+    } else {
+      endY = drawTextWrapped(state.logBody, 24, textY + 14 - state.readingScroll, BASE_W - 52, COLORS.text, 12);
+      endY += state.readingScroll;
+    }
+
     ctx.restore();
-    drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-    drawText('\u2191\u2193 Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+
+    // Calculate max scroll
+    state._maxScroll = Math.max(0, endY - textY - textH + 20);
+
+    // Scroll indicators (triangles)
+    if (state.readingScroll > 0) {
+      ctx.fillStyle = COLORS.textHighlight;
+      ctx.beginPath();
+      ctx.moveTo(BASE_W / 2 - 6, textY); ctx.lineTo(BASE_W / 2 + 6, textY); ctx.lineTo(BASE_W / 2, textY - 6);
+      ctx.fill();
+    }
+    if (state.readingScroll < (state._maxScroll || 0)) {
+      ctx.fillStyle = COLORS.textHighlight;
+      ctx.beginPath();
+      const triBot = textY + textH;
+      ctx.moveTo(BASE_W / 2 - 6, triBot); ctx.lineTo(BASE_W / 2 + 6, triBot); ctx.lineTo(BASE_W / 2, triBot + 6);
+      ctx.fill();
+    }
+
+    // Keyboard help box — JRPG style
+    const helpH = 32;
+    const helpY = BASE_H - helpH - 6;
+    drawBox(10, helpY, BASE_W - 20, helpH);
+    ctx.fillStyle = 'rgba(10, 12, 30, 0.85)';
+    ctx.fillRect(12, helpY + 1, BASE_W - 24, helpH - 2);
+    const hLabelY = helpY + 13;
+    const hKeyY = helpY + 25;
+    // Keys
+    const keys = [
+      { key: 'TAB', label: state.logBriefMode ? 'Raw' : 'Brief', x: 20 },
+      { key: '↑↓', label: 'Scroll', x: 90 },
+      { key: 'PgUp/Dn', label: 'Fast', x: 155 },
+      { key: 'Home/End', label: 'Top/Bot', x: 240 },
+      { key: 'ESC', label: 'Back', x: BASE_W - 60 },
+    ];
+    for (const k of keys) {
+      // key badge
+      ctx.fillStyle = '#334';
+      const kw = k.key.length * 6 + 6;
+      ctx.fillRect(k.x, hLabelY - 8, kw, 12);
+      ctx.strokeStyle = COLORS.textDisabled;
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(k.x, hLabelY - 8, kw, 12);
+      drawText(k.key, k.x + 3, hLabelY, COLORS.textHighlight, 7);
+      drawText(k.label, k.x + 3, hKeyY, COLORS.textDisabled, 7);
+    }
     return;
   }
+
+  // Session count — only in list mode
+  drawText(`${state.logItems.length} sessions`, BASE_W - 110, 24, COLORS.textDisabled, 8);
 
   if (state.logLoading) {
     drawText('Loading transcripts...', 24, 60, COLORS.textDisabled);
@@ -2745,8 +4208,27 @@ function renderLog() {
 
   ctx.restore();
 
-  drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-  drawText('ENTER Read   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  // Keyboard help box
+  const lhH = 32;
+  const lhY = BASE_H - lhH - 6;
+  drawBox(10, lhY, BASE_W - 20, lhH);
+  ctx.fillStyle = 'rgba(10, 12, 30, 0.85)';
+  ctx.fillRect(12, lhY + 1, BASE_W - 24, lhH - 2);
+  const lKeys = [
+    { key: 'ENTER', label: 'Read', x: 20 },
+    { key: '↑↓', label: 'Select', x: 90 },
+    { key: 'ESC', label: 'Back', x: BASE_W - 60 },
+  ];
+  for (const k of lKeys) {
+    ctx.fillStyle = '#334';
+    const kw = k.key.length * 6 + 6;
+    ctx.fillRect(k.x, lhY + 5, kw, 12);
+    ctx.strokeStyle = COLORS.textDisabled;
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(k.x, lhY + 5, kw, 12);
+    drawText(k.key, k.x + 3, lhY + 13, COLORS.textHighlight, 7);
+    drawText(k.label, k.x + 3, lhY + 25, COLORS.textDisabled, 7);
+  }
 }
 
 function handleLogSelect() {
@@ -2893,7 +4375,7 @@ async function syncPersonaState() {
 // ── Live Transcription Scene ──
 
 const SPEAKER_COLORS = ['#88ccff', '#ff88aa', '#ffaa00', '#44dd88', '#aa88ff', '#ff6644', '#44ccff', '#ffcc44'];
-const CHUNK_INTERVAL = 25000;
+const CHUNK_INTERVAL = 15000;
 let liveElapsedTimer = null;
 
 function getSpeakerColor(name) {
@@ -2919,11 +4401,32 @@ function addBubble(speaker, text, opts = {}) {
     isPersona,
     time: Date.now(),
   });
-  // Auto-scroll to bottom
-  state.liveScroll = Math.max(0, state.liveBubbles.length * 70 - 200);
+  // Auto-scroll to bottom (will be clamped by maxBubbleScroll in render)
+  state.liveScroll = 999999;
 }
 
 async function startLiveSession() {
+  state._sessionXP = {};
+  state._sessionEvents = [];
+  state._microSeen = {};
+  state.liveCharacters = {};
+  state.liveEvents = [];
+  state._liveEventAnim = null;
+
+  // Check for unsaved session backup
+  try {
+    const backup = localStorage.getItem('hmcp_session_backup');
+    if (backup) {
+      const data = JSON.parse(backup);
+      const age = (Date.now() - new Date(data.timestamp).getTime()) / 60000;
+      if (age < 1440) { // less than 24h old
+        addBubble('System', `Recovered backup from ${Math.round(age)} min ago (${data.lines.length} lines). Saved to localStorage.`, { color: '#ffaa00' });
+      } else {
+        localStorage.removeItem('hmcp_session_backup');
+      }
+    }
+  } catch (_) {}
+
   try {
     addBubble('System', 'Requesting mic access...', { color: '#88ccff' });
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -2963,43 +4466,67 @@ async function startLiveSession() {
         stopLiveSession();
       };
 
-      // Stop/start cycle: stop creates complete file with headers
+      // Continuous recording with periodic flush via requestData()
+      // No stop/start gap — audio is never lost
       let audioChunks = [];
+      let flushPending = false;
+
       state.liveRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunks.push(e.data);
+        // Send accumulated chunks when flush was requested
+        if (flushPending && audioChunks.length > 0) {
+          flushPending = false;
+          const blob = new Blob(audioChunks, { type: actualMime });
+          audioChunks = [];
+          if (blob.size > 1000 && state.liveWs && state.liveWs.readyState === 1) {
+            state._lastChunkSent = Date.now();
+            blob.arrayBuffer().then(buf => {
+              if (state.liveWs && state.liveWs.readyState === 1) state.liveWs.send(buf);
+            });
+          }
+        }
       };
 
       state.liveRecorder.onstop = () => {
-        if (audioChunks.length === 0) return;
-        const blob = new Blob(audioChunks, { type: actualMime });
-        audioChunks = [];
-        if (blob.size > 1000 && state.liveWs && state.liveWs.readyState === 1) {
-          blob.arrayBuffer().then(buf => {
-            if (state.liveWs && state.liveWs.readyState === 1) state.liveWs.send(buf);
-          });
-        }
-        // Restart if still active
-        if (stream.active && state.liveActive) {
-          try { state.liveRecorder.start(); } catch(_) {}
+        // Final flush on stop
+        if (audioChunks.length > 0) {
+          const blob = new Blob(audioChunks, { type: actualMime });
+          audioChunks = [];
+          if (blob.size > 1000 && state.liveWs && state.liveWs.readyState === 1) {
+            blob.arrayBuffer().then(buf => {
+              if (state.liveWs && state.liveWs.readyState === 1) state.liveWs.send(buf);
+            });
+          }
         }
       };
 
-      state.liveRecorder.start();
+      state.liveRecorder.start(1000); // timeslice: fire ondataavailable every 1s
 
       state._chunkFlushTimer = setInterval(() => {
         if (state.liveRecorder && state.liveRecorder.state === 'recording') {
-          state.liveRecorder.stop();
+          flushPending = true;
+          state.liveRecorder.requestData(); // triggers ondataavailable without stopping
         }
       }, CHUNK_INTERVAL);
 
       state.liveActive = true;
       state.liveStartTime = Date.now();
+      state._lastChunkSent = Date.now();
+      _startVaultPing();
+      connectPhoneMic();
       liveElapsedTimer = setInterval(() => {
         state.liveElapsed = Math.floor((Date.now() - state.liveStartTime) / 1000);
+        // Long session micro-comment at 30 min
+        if (state.liveElapsed === 1800) {
+          const active = PERSONAS.filter(p => p.active !== false && state._sessionXP[p.id]);
+          active.forEach(p => _microComment(p, 'long_session'));
+        }
       }, 500);
     };
 
-    state.liveWs.onmessage = (e) => {
+    state._wsOk = true;
+    state._wsStopping = false;
+    state._wsMessageHandler = (e) => {
       try {
         const d = JSON.parse(e.data);
         if (d.error) {
@@ -3011,6 +4538,8 @@ async function startLiveSession() {
           state.liveSummary = d;
           state.scene = 'live-summary';
           state.readingScroll = 0;
+          // Clear local backup — server confirmed save
+          try { localStorage.removeItem('hmcp_session_backup'); } catch (_) {}
           // Clean up WebSocket now that save is confirmed
           if (state.liveWs) {
             state.liveWs.onclose = null;
@@ -3048,6 +4577,21 @@ async function startLiveSession() {
             color: d.persona_color || (p ? p.color : '#888'),
           });
           playSfx('typewriter');
+          // Track XP contribution silently + micro-comments
+          if (p) {
+            if (!state._sessionXP[p.id]) state._sessionXP[p.id] = { contributions: 0, tokens: 0 };
+            const prevC = state._sessionXP[p.id].contributions;
+            state._sessionXP[p.id].contributions++;
+            const tokens = estimateTokens(d.response);
+            state._sessionXP[p.id].tokens += tokens;
+            drainMP(p, tokens);
+            // Micro-comment triggers
+            if (prevC === 0) _microComment(p, 'first_contrib');
+            if (prevC < 5 && prevC + 1 >= 5) _microComment(p, 'contrib_5');
+            if (prevC < 10 && prevC + 1 >= 10) _microComment(p, 'contrib_10');
+            if (p.mp <= 0) _microComment(p, 'mp_drained');
+            else if (p.mp < p.mpMax * 0.2) _microComment(p, 'mp_low');
+          }
         }
         if (d.speaker_stats) {
           for (const [name, data] of Object.entries(d.speaker_stats)) {
@@ -3060,15 +4604,49 @@ async function startLiveSession() {
           state.liveMood = d.face_analysis;
           state.liveMoodTime = Date.now();
         }
+        if (d.lie_detector) {
+          const sev = d.severity || 'low';
+          const sevIcon = sev === 'high' ? '🔴' : sev === 'medium' ? '🟡' : '⚪';
+          addBubble('Lie Detector', `${sevIcon} ${d.speaker}: "${d.claim}" — sprzeczne z: "${d.contradiction}"\n→ ${d.reasoning}`, {
+            color: sev === 'high' ? '#ff2222' : sev === 'medium' ? '#ffaa00' : '#888',
+          });
+          playSfx('alert');
+        }
+        if (d.egg) {
+          triggerEncounter(
+            '★ MACIEK ★',
+            'Legendarny Boss — Poziom ∞',
+            d.text || 'Agent wie, że Maciek jest najlepszy. Oficjalnie potwierdzone.',
+            '#ffcc00'
+          );
+        }
+        if (d.live_event && d.events) {
+          d.events.forEach(function(evt) {
+            state.liveEvents.push({ ...evt, time: Date.now() });
+            triggerLiveEvent(evt);
+          });
+        }
+        if (d.character_update && d.characters) {
+          for (const [id, char] of Object.entries(d.characters)) {
+            if (!state.liveCharacters[id]) {
+              state.liveCharacters[id] = { ...char, color: getSpeakerColor(id) };
+              generateAvatar(char.name || id, 32);
+            } else {
+              Object.assign(state.liveCharacters[id], char);
+            }
+          }
+        }
       } catch (parseErr) {
         console.warn('Live WS parse error:', parseErr);
       }
     };
+    state.liveWs.onmessage = state._wsMessageHandler;
 
     state.liveWs.onclose = (ev) => {
-      if (state.liveActive) {
-        addBubble('System', 'Connection closed' + (ev.code !== 1000 ? ' (code ' + ev.code + ')' : ''), { color: '#ffcc44' });
-        stopLiveSession();
+      state._wsOk = false;
+      if (state.liveActive && !state._wsStopping) {
+        addBubble('System', 'WS disconnected — reconnecting...', { color: '#ffcc44' });
+        _reconnectWs();
       }
     };
   } catch (e) {
@@ -3076,7 +4654,81 @@ async function startLiveSession() {
   }
 }
 
+function _reconnectWs(attempt) {
+  attempt = attempt || 0;
+  if (!state.liveActive || attempt > 5) {
+    if (attempt > 5) addBubble('System', 'Reconnect failed after 5 attempts', { color: '#ff4444' });
+    return;
+  }
+  const delay = Math.min(2000 * Math.pow(1.5, attempt), 10000);
+  setTimeout(() => {
+    if (!state.liveActive) return;
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProto}//localhost:7331/ws/transcribe`);
+    ws.onopen = () => {
+      state.liveWs = ws;
+      state._wsOk = true;
+      // Re-send format
+      const mt = state.liveRecorder ? (state.liveRecorder.mimeType || 'audio/webm') : 'audio/webm';
+      ws.send(JSON.stringify({ action: 'format', mime: mt }));
+      addBubble('System', 'Reconnected', { color: '#44dd88' });
+      // Attach same message handler
+      ws.onmessage = state._wsMessageHandler;
+      ws.onclose = (ev) => {
+        state._wsOk = false;
+        if (state.liveActive && !state._wsStopping) {
+          addBubble('System', 'WS lost again — reconnecting...', { color: '#ffcc44' });
+          _reconnectWs(0);
+        }
+      };
+    };
+    ws.onerror = () => {
+      _reconnectWs(attempt + 1);
+    };
+  }, delay);
+}
+
+// ── Phone mic ──
+function connectPhoneMic() {
+  if (state._phoneMic && state._phoneMic.readyState <= 1) return; // already connected
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try {
+    state._phoneMic = new WebSocket(`${wsProto}//localhost:7331/ws/phone-mic`);
+    state._phoneMic.onopen = () => {
+      state._phoneMicOk = true;
+      addBubble('System', 'Phone mic connected', { color: '#44dd88' });
+    };
+    state._phoneMic.onclose = () => { state._phoneMicOk = false; };
+    state._phoneMic.onerror = () => { state._phoneMicOk = false; };
+    state._phoneMic.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        state._phoneMicOk = d.status === 'connected' || d.status === 'ok';
+      } catch (_) {}
+    };
+  } catch (_) {
+    state._phoneMicOk = false;
+  }
+}
+
+// Keep vault connection alive — periodic health check
+let _vaultPingTimer = null;
+function _startVaultPing() {
+  if (_vaultPingTimer) return;
+  _vaultPingTimer = setInterval(() => {
+    fetch(LOCAL_VAULT_URL + '/health', { signal: AbortSignal.timeout(3000) })
+      .then(r => { state._vaultOk = r.ok; })
+      .catch(() => { state._vaultOk = false; });
+  }, 10000);
+}
+function _stopVaultPing() {
+  if (_vaultPingTimer) { clearInterval(_vaultPingTimer); _vaultPingTimer = null; }
+}
+
 function stopLiveSession() {
+  state._wsStopping = true;
+  _stopVaultPing();
+  state._wsOk = false;
   clearInterval(liveElapsedTimer);
   clearInterval(state._chunkFlushTimer);
   liveElapsedTimer = null;
@@ -3101,10 +4753,17 @@ function stopLiveSession() {
   state.liveActive = false;
   state.liveRecorder = null;
   state.liveWs = null;
+  // Close phone mic
+  if (state._phoneMic && state._phoneMic.readyState <= 1) {
+    state._phoneMic.close();
+  }
+  state._phoneMic = null;
+  state._phoneMicOk = false;
 }
 
 function saveLiveSession() {
   if (!state.liveWs || state.liveWs.readyState !== 1) return;
+  state._wsStopping = true;
   clearInterval(liveElapsedTimer);
   // Stop recording but keep WebSocket alive for server response
   if (state.liveRecorder) {
@@ -3120,14 +4779,59 @@ function saveLiveSession() {
     state.liveStream = null;
   }
   state.liveActive = false;
+  // Award XP to all participating personas
+  state._sessionEvents = [];
+  const today = new Date().toISOString().slice(0, 10);
+  for (const [pid, data] of Object.entries(state._sessionXP)) {
+    const p = PERSONAS.find(pp => pp.id === pid);
+    if (!p || !p.prog) continue;
+    const baseXP = 20 + data.contributions * 15;
+    const events = awardXP(p, baseXP);
+    state._sessionEvents.push(...events);
+    p.prog.sessions = (p.prog.sessions || 0) + 1;
+    p.prog.totalContribs = (p.prog.totalContribs || 0) + data.contributions;
+    if (data.contributions > (p.prog.maxContribSession || 0)) {
+      p.prog.maxContribSession = data.contributions;
+    }
+    // Streak tracking
+    if (p.prog.lastSessionDate === today) { /* same day, no extra streak */ }
+    else {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      p.prog.streak = p.prog.lastSessionDate === yesterday ? (p.prog.streak || 0) + 1 : 1;
+    }
+    p.prog.lastSessionDate = today;
+    // Re-check achievements after session stats update
+    ACHIEVEMENTS.forEach(a => {
+      if (!p.prog.achievements.includes(a.id) && a.check(p)) {
+        p.prog.achievements.push(a.id);
+        state._sessionEvents.push({ type: 'achievement', persona: p.id, achievement: a });
+      }
+    });
+  }
+  regenMP();
+  saveProgression();
+  state._sessionXP = {};
+  // Local backup — save transcript to localStorage before server save
+  const backupKey = 'hmcp_session_backup';
+  const bubbleTexts = state.liveBubbles
+    .filter(b => !b.isPersona && b.speaker !== 'System')
+    .map(b => `[${b.speaker}] ${b.text}`);
+  if (bubbleTexts.length > 0) {
+    try {
+      localStorage.setItem(backupKey, JSON.stringify({
+        timestamp: new Date().toISOString(),
+        elapsed: state.liveElapsed,
+        lines: bubbleTexts,
+        raw: bubbleTexts.join('\n'),
+      }));
+    } catch (_) {}
+  }
+
   addBubble('System', 'Saving session...', { color: '#88ccff' });
-  // Send save — keep WS open so onmessage can receive {final: true}
-  // onmessage handler will set scene to 'live-summary' when it gets the response
-  // Timeout: if no response in 10s, show error
   const ws = state.liveWs;
   const saveTimeout = setTimeout(() => {
     if (state.scene !== 'live-summary') {
-      addBubble('System', 'Save timeout — server did not confirm', { color: '#ff4444' });
+      addBubble('System', 'Save timeout — local backup preserved. Retry with server restart.', { color: '#ffaa00' });
       if (ws && ws.readyState <= 1) ws.close();
       state.liveWs = null;
     }
@@ -3156,9 +4860,38 @@ function renderLive() {
     }
     drawText('REC', 30, 24, '#ff4444', 10);
     drawText(fmtElapsed(state.liveElapsed), 60, 24, COLORS.text, 10);
+    // Chunk progress bar — fills between sends
+    const chunkElapsed = Date.now() - state._lastChunkSent;
+    const chunkPct = Math.min(1, chunkElapsed / CHUNK_INTERVAL);
+    const cpX = 108, cpW = 60, cpH = 4, cpY = 19;
+    ctx.fillStyle = '#1a1a4a';
+    ctx.fillRect(cpX, cpY, cpW, cpH);
+    const fillCol = chunkPct < 0.85 ? '#4488ff44' : '#44dd8888';
+    ctx.fillStyle = fillCol;
+    ctx.fillRect(cpX, cpY, Math.floor(cpW * chunkPct), cpH);
+    ctx.strokeStyle = COLORS.dialogBorderInner;
+    ctx.strokeRect(cpX, cpY, cpW, cpH);
+    const secLeft = Math.max(0, Math.ceil((CHUNK_INTERVAL - chunkElapsed) / 1000));
+    drawText(secLeft + 's', cpX + cpW + 4, 24, COLORS.textDisabled, 7);
   } else {
     drawText('Live', 20, 24, COLORS.textHighlight, 11);
   }
+  // Connection status icons (right side of header)
+  const icX = BASE_W - 170;
+  // Vault
+  ctx.fillStyle = state._vaultOk ? '#44dd88' : '#ff4444';
+  ctx.fillRect(icX, 16, 6, 6);
+  drawText('DB', icX + 8, 24, COLORS.textDisabled, 7);
+  // WebSocket
+  const wsOk = state.liveWs && state.liveWs.readyState === 1;
+  ctx.fillStyle = wsOk ? '#44dd88' : (state.liveActive ? '#ffaa00' : '#666');
+  ctx.fillRect(icX + 30, 16, 6, 6);
+  drawText('WS', icX + 38, 24, COLORS.textDisabled, 7);
+  // Phone mic
+  ctx.fillStyle = state._phoneMicOk ? '#44dd88' : '#333';
+  ctx.fillRect(icX + 58, 16, 6, 6);
+  drawText('MIC2', icX + 66, 24, state._phoneMicOk ? COLORS.textDisabled : '#333', 7);
+
   drawText(`${state.liveBubbles.length} chunks`, BASE_W - 100, 24, COLORS.textDisabled, 8);
 
   // ── Mood badge ──
@@ -3193,7 +4926,7 @@ function renderLive() {
 
   drawText('WHO', 18, sideY + 14, COLORS.textDisabled, 7);
   let sy = sideY + 24;
-  if (speakers.length > 0) {
+  if (speakers.length > 0 && state.liveActive) {
     speakers.slice(0, 8).forEach(([name, data]) => {
       drawFace(name, 16, sy - 4, 20, true);
       const shortName = name.length > 7 ? name.slice(0, 6) + '.' : name;
@@ -3202,20 +4935,79 @@ function renderLive() {
       sy += 26;
     });
   } else {
-    // Show active personas when idle
-    PERSONAS.filter(p => p.active !== false).slice(0, 6).forEach(p => {
+    // Show all personas — toggleable
+    PERSONAS.slice(0, 8).forEach((p, i) => {
+      const isActive = p.active !== false;
+      const isCursor = state.liveWhoFocused && i === state.liveWhoCursor;
+
+      // Highlight bar for cursor
+      if (isCursor) {
+        ctx.fillStyle = '#ffffff18';
+        ctx.fillRect(12, sy - 6, sideW - 4, 22);
+      }
+
+      // Dim inactive personas
+      if (!isActive) ctx.globalAlpha = 0.35;
       drawFace(p.id, 16, sy - 4, 20, true);
+      ctx.globalAlpha = 1.0;
+
       const shortName = p.name.split(' ')[0];
       const sn = shortName.length > 7 ? shortName.slice(0, 6) + '.' : shortName;
-      drawText(sn, 40, sy + 6, p.color, 7);
+      const nameCol = isActive ? p.color : COLORS.textDisabled;
+      drawText(sn, 40, sy + 6, nameCol, 7);
       sy += 22;
+    });
+  }
+
+  // ── CAST sidebar (right) ──
+  const hasCast = Object.keys(state.liveCharacters).length > 0;
+  const castW = hasCast ? 80 : 0;
+
+  if (hasCast) {
+    const castX = BASE_W - 90;
+    const castY = sideY;
+    const castH = sideH;
+    drawBox(castX, castY, castW, castH);
+
+    drawText('CAST', castX + 8, castY + 14, COLORS.textDisabled, 7);
+    let cy = castY + 24;
+    const chars = Object.entries(state.liveCharacters)
+      .sort((a, b) => (b[1].percent || 0) - (a[1].percent || 0))
+      .slice(0, 6);
+
+    chars.forEach(([id, char]) => {
+      const dimChar = (char.percent || 0) < 5;
+      if (dimChar) ctx.globalAlpha = 0.35;
+
+      drawFace(char.name || id, castX + 4, cy - 4, 20, true);
+
+      const charColor = char.color || COLORS.text;
+      if (char.name) {
+        const shortName = char.name.length > 8 ? char.name.slice(0, 7) + '.' : char.name;
+        drawText(shortName, castX + 28, cy + 4, charColor, 7);
+        if (char.epithet) {
+          const shortEp = char.epithet.length > 8 ? char.epithet.slice(0, 7) + '.' : char.epithet;
+          drawText(shortEp, castX + 28, cy + 12, COLORS.textDisabled, 6);
+        }
+      } else if (char.epithet) {
+        const shortEp = char.epithet.length > 8 ? char.epithet.slice(0, 7) + '.' : char.epithet;
+        drawText(shortEp, castX + 28, cy + 4, charColor, 7);
+      } else {
+        const shortId = id.length > 8 ? id.slice(0, 7) + '.' : id;
+        drawText(shortId, castX + 28, cy + 4, charColor, 7);
+      }
+
+      drawText((char.percent || 0) + '%', castX + 28, cy + (char.name && char.epithet ? 20 : 12), COLORS.textDisabled, 6);
+
+      if (dimChar) ctx.globalAlpha = 1.0;
+      cy += (char.name && char.epithet ? 30 : 26);
     });
   }
 
   // ── Bubble area (main panel) ──
   const bubbleX = sideW + 18;
   const bubbleY = 40;
-  const bubbleW = BASE_W - bubbleX - 10;
+  const bubbleW = BASE_W - bubbleX - 10 - (hasCast ? castW + 8 : 0);
   const bubbleH = sideH;
   drawBox(bubbleX - 4, bubbleY, bubbleW + 8, bubbleH);
 
@@ -3250,61 +5042,103 @@ function renderLive() {
 
     iy += 8;
 
-    // Active personas that will participate
+    // Active personas that will participate — horizontal layout
     const activeP = PERSONAS.filter(p => p.active !== false);
     if (activeP.length > 0) {
       drawText('ACTIVE TEAM', bubbleX + 4, iy, COLORS.textDisabled, 7);
       iy += 14;
-      activeP.slice(0, 6).forEach(p => {
-        drawFace(p.id, bubbleX + 4, iy - 4, 20, true);
-        drawText(p.name, bubbleX + 28, iy + 4, p.color, 8);
-        drawText(p.role, bubbleX + 28, iy + 14, COLORS.textDisabled, 7);
-        iy += 26;
+      const colW = Math.min(120, Math.floor((bubbleW - 8) / Math.min(activeP.length, 3)));
+      let cx = bubbleX + 4;
+      let rowStartY = iy;
+      let rowMaxH = 0;
+      activeP.slice(0, 6).forEach((p, i) => {
+        if (i > 0 && cx + colW > bubbleX + bubbleW - 4) {
+          cx = bubbleX + 4;
+          rowStartY += rowMaxH + 4;
+          rowMaxH = 0;
+        }
+        drawFace(p.id, cx, rowStartY - 4, 18, true);
+        drawText(p.name, cx + 22, rowStartY + 2, p.color, 7);
+        drawText(p.role, cx + 22, rowStartY + 11, COLORS.textDisabled, 6);
+        cx += colW;
+        rowMaxH = Math.max(rowMaxH, 22);
       });
+      iy = rowStartY + rowMaxH + 4;
     }
 
     iy += 10;
-    drawText('Press ENTER to start recording', bubbleX + 4, iy, COLORS.textDisabled, 8);
-    iy += 12;
-    drawText('Audio \u2192 Whisper \u2192 AI team analysis', bubbleX + 4, iy, COLORS.textDisabled, 7);
+    if (state.liveWhoFocused) {
+      drawText('\u2190\u2191\u2193 select persona   ENTER toggle   \u2192 record', bubbleX + 4, iy, COLORS.textDisabled, 7);
+    } else {
+      drawText('Press ENTER to start recording', bubbleX + 4, iy, COLORS.textDisabled, 8);
+      iy += 12;
+      drawText('Audio \u2192 Whisper \u2192 AI team analysis', bubbleX + 4, iy, COLORS.textDisabled, 7);
+      iy += 14;
+      drawText('Phone mic: /phone-mic.html (same network)', bubbleX + 4, iy, '#333', 6);
+    }
   }
 
-  // Render bubbles
-  const maxBubbleScroll = Math.max(0, state.liveBubbles.length * 58 - bubbleH + 20);
+  // Measure bubble heights first (for scroll calculation)
+  function measureWrapped(text, maxWidth) {
+    ctx.font = '10px "Courier New", monospace';
+    let lines = 0;
+    const paragraphs = text.split('\n');
+    for (const para of paragraphs) {
+      if (para.trim() === '') { lines += 0.5; continue; }
+      const words = para.split(' ');
+      let line = '';
+      for (const word of words) {
+        const test = line + (line ? ' ' : '') + word;
+        if (ctx.measureText(test).width > maxWidth && line) { lines++; line = word; }
+        else { line = test; }
+      }
+      if (line) lines++;
+    }
+    return Math.max(1, lines);
+  }
+
+  const bubblePad = 12;
+  const bubbleHeights = state.liveBubbles.map(b => {
+    const textW = b.isPersona ? bubbleW - 44 : bubbleW - 30;
+    const textLines = measureWrapped(b.text, textW);
+    const textH = textLines * 11;
+    return (b.isPersona ? 28 : 24) + textH + bubblePad;
+  });
+  const totalBubbleH = bubbleHeights.reduce((s, h) => s + h, 0);
+  const maxBubbleScroll = Math.max(0, totalBubbleH - bubbleH + 20);
   if (state.liveScroll > maxBubbleScroll) state.liveScroll = maxBubbleScroll;
 
   let by = bubbleY + 10 - state.liveScroll;
-  state.liveBubbles.forEach((b) => {
-    if (by > bubbleY + bubbleH + 10 || by + 50 < bubbleY) { by += 58; return; }
+  state.liveBubbles.forEach((b, bi) => {
+    const bh = bubbleHeights[bi];
+    if (by > bubbleY + bubbleH + 10 || by + bh < bubbleY) { by += bh; return; }
 
     if (b.isPersona) {
-      // Persona bubble — left-aligned with portrait + color accent
       const pId = PERSONAS.find(p => p.name === b.speaker || p.id === b.speaker)?.id || b.speaker;
       drawFace(pId, bubbleX, by, 24, true);
-      // Name
       drawText(b.speaker, bubbleX + 28, by + 8, b.color, 8);
-      // Bubble body
+      // Bubble background
+      const bodyH = bh - 28;
       ctx.fillStyle = b.color + '18';
-      const bubH = 36;
       ctx.beginPath();
-      roundRect(ctx, bubbleX + 28, by + 12, bubbleW - 34, bubH, 3);
+      roundRect(ctx, bubbleX + 28, by + 14, bubbleW - 34, bodyH, 3);
       ctx.fill();
       ctx.strokeStyle = b.color + '44';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      roundRect(ctx, bubbleX + 28, by + 12, bubbleW - 34, bubH, 3);
+      roundRect(ctx, bubbleX + 28, by + 14, bubbleW - 34, bodyH, 3);
       ctx.stroke();
-      // Text
-      drawTextWrapped(b.text, bubbleX + 32, by + 24, bubbleW - 44, COLORS.text, 11);
+      drawTextWrapped(b.text, bubbleX + 32, by + 26, bubbleW - 44, COLORS.text, 11);
     } else {
-      // Speaker bubble — right-aligned feel
       drawFace(b.speaker, bubbleX, by, 20, true);
       drawText(b.speaker, bubbleX + 24, by + 8, b.color, 8);
-      // Text body
-      drawTextWrapped(b.text, bubbleX + 24, by + 20, bubbleW - 30, COLORS.dialogBorder, 11);
+      drawTextWrapped(b.text, bubbleX + 24, by + 22, bubbleW - 30, COLORS.dialogBorder, 11);
     }
-    by += 58;
+    by += bh;
   });
+
+  // Live event overlay (within clipped bubble area)
+  if (state._liveEventAnim) renderLiveEvent(bubbleX, bubbleW);
 
   ctx.restore();
 
@@ -3314,8 +5148,10 @@ function renderLive() {
     drawText('ENTER Save   \u2191\u2193 Scroll   ESC Stop', 20, BASE_H - 14, COLORS.textDisabled, 8);
   } else if (state.liveBubbles.length > 0) {
     drawText('\u2191\u2193 Scroll   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  } else if (state.liveWhoFocused) {
+    drawText('\u2191\u2193 Select   ENTER Toggle   \u2192 Record   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
   } else {
-    drawText('ENTER Start recording   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
+    drawText('ENTER Start recording   \u2190 Team   ESC Back', 20, BASE_H - 14, COLORS.textDisabled, 8);
   }
 }
 
@@ -3357,6 +5193,29 @@ function renderLiveSummary() {
     ty += 8;
   }
 
+  // XP gains from this session
+  if (state._sessionEvents && state._sessionEvents.length > 0) {
+    drawText('XP RESULTS', 24, ty, '#ffcc44', 7);
+    ty += 12;
+    const seen = new Set();
+    state._sessionEvents.forEach(ev => {
+      if (ev.type === 'levelup' && !seen.has('lv-' + ev.persona)) {
+        seen.add('lv-' + ev.persona);
+        const p = PERSONAS.find(pp => pp.id === ev.persona);
+        const name = p ? p.name : ev.persona;
+        drawText(`⬆ ${name} → Lv ${ev.lv}`, 28, ty, '#ffcc44', 9);
+        ty += 14;
+      }
+      if (ev.type === 'achievement') {
+        const p = PERSONAS.find(pp => pp.id === ev.persona);
+        const name = p ? p.name : ev.persona;
+        drawText(`${ev.achievement.icon} ${name}: ${ev.achievement.name}`, 28, ty, COLORS.hpGreen, 9);
+        ty += 14;
+      }
+    });
+    ty += 8;
+  }
+
   if (s.summary) {
     drawText('SUMMARY', 24, ty, COLORS.textDisabled, 7);
     ty += 14;
@@ -3366,8 +5225,11 @@ function renderLiveSummary() {
   ctx.restore();
 
   drawBox(10, BASE_H - 28, BASE_W - 20, 22);
-  drawText('\u2191\u2193 Scroll   ESC Back to menu', 20, BASE_H - 14, COLORS.textDisabled, 8);
+  drawText('\u2191\u2193 Scroll   N Narada   ESC Back to menu', 20, BASE_H - 14, COLORS.textDisabled, 8);
 }
+
+// ── Test Export ──
+window.__TEST__ = { state, PERSONAS, SKILLS, COLORS, handleKey, handleSelect, handlePaste, showDialog, mcpCall, mcpDirect, connectToServer, fetchPersonas, fetchSkills, startLiveSession, stopLiveSession, render, addBubble, loadProgression, saveProgression, awardXP, ACHIEVEMENTS, ALLOWED_TOOLS, VAULT_FEATURES, loadSettings, saveSettings };
 
 // ── Start ──
 

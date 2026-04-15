@@ -4,6 +4,8 @@ Complete guide to running the humanMCP ecosystem locally.
 
 ## Architecture
 
+### Full local setup (all features)
+
 ```
                                     Internet
                                        │
@@ -26,6 +28,20 @@ Complete guide to running the humanMCP ecosystem locally.
                                                  │   :11434    │
                                                  └─────────────┘
 ```
+
+### GitHub Pages / direct mode (no local services)
+
+```
+             ┌─────────────┐              ┌────────────────┐
+             │  RPG Client │  JSON-RPC    │   Fly.io       │
+             │  (browser)  │ ────────────►│  humanmcp-go   │
+             │  GitHub     │  direct      │  /mcp          │
+             │  Pages      │ ◄────────────│  CORS: *       │
+             └─────────────┘              └────────────────┘
+```
+
+In direct mode, the client connects straight to humanMCP via JSON-RPC.
+No proxy needed. Live, Log, and Narada are disabled (require mysloodsiewnia).
 
 ## Prerequisites
 
@@ -125,13 +141,24 @@ Or manually add to `~/.config/claude/claude_desktop_config.json`:
 
 ## Ports Summary
 
-| Service           | Port  | Required |
-|-------------------|-------|----------|
-| RPG Client        | 8080  | yes      |
-| RPG Proxy         | 3001  | yes      |
-| humanmcp-go       | 8080  | remote   |
-| mysloodsiewnia    | 7331  | for Vault|
-| Ollama            | 11434 | for Vault|
+| Service        | Port  | Required for          |
+|----------------|-------|-----------------------|
+| RPG Client     | 8080  | always (or GitHub Pages) |
+| RPG Proxy      | 3001  | local mode only       |
+| humanmcp-go    | 8080  | remote (fly.dev)      |
+| mysloodsiewnia | 7331  | Live, Log, Narada     |
+| Ollama         | 11434 | mysloodsiewnia        |
+
+### What needs what
+
+| Feature | humanMCP (fly.dev) | Proxy | mysloodsiewnia | Ollama |
+|---------|:--:|:--:|:--:|:--:|
+| Team, Skills, Library, About | yes | optional | -- | -- |
+| Vault Search | yes | optional | optional (local search) | -- |
+| Message, Bootstrap | yes | optional | -- | -- |
+| Live Transcription | -- | yes | yes | -- |
+| Quest Log | -- | yes | yes | -- |
+| Narada | -- | yes | yes | yes |
 
 ## Quick Health Checks
 

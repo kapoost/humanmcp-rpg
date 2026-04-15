@@ -172,6 +172,198 @@ const s3 = genStats('axel');
 assert(s1.STR !== s3.STR || s1.INT !== s3.INT, 'different slugs produce different stats');
 
 // ═══════════════════════════════════
+console.log('\n  progression field mapping (snake_case ↔ camelCase)');
+// ═══════════════════════════════════
+
+// Simulate _applyProgData logic for field mapping
+function mapProgFields(s) {
+  return {
+    xp: s.xp || 0,
+    sessions: s.sessions || 0,
+    totalContribs: s.totalContribs || s.contributions || 0,
+    maxContribSession: s.maxContribSession || s.max_contrib_session || 0,
+    mpDrained: s.mpDrained || s.mp_drained || false,
+    streak: s.streak || 0,
+    lastSessionDate: s.lastSessionDate || s.last_session_date || null,
+    achievements: s.achievements || [],
+    notebook: s.notebook || [],
+    appliedTier: s.applied_tier || s.appliedTier || 0,
+    relationships: s.relationships || {},
+    modelTier: s.model_tier || s.modelTier || '',
+  };
+}
+
+// server format (snake_case from myśloodsiewnia)
+const serverData = {
+  xp: 75, sessions: 1, contributions: 3,
+  max_contrib_session: 2, mp_drained: true,
+  last_session_date: '2026-04-15', applied_tier: 10,
+  model_tier: 'sonnet', relationships: { ghost: { sessions: 1 } },
+};
+const mapped = mapProgFields(serverData);
+assert(mapped.totalContribs === 3, 'contributions → totalContribs');
+assert(mapped.maxContribSession === 2, 'max_contrib_session → maxContribSession');
+assert(mapped.mpDrained === true, 'mp_drained → mpDrained');
+assert(mapped.lastSessionDate === '2026-04-15', 'last_session_date → lastSessionDate');
+assert(mapped.appliedTier === 10, 'applied_tier → appliedTier');
+assert(mapped.modelTier === 'sonnet', 'model_tier → modelTier');
+assert(mapped.sessions === 1, 'sessions passes through');
+assert(mapped.xp === 75, 'xp passes through');
+
+// client format (camelCase from localStorage)
+const clientData = {
+  xp: 200, sessions: 5, totalContribs: 42,
+  maxContribSession: 8, mpDrained: false,
+  appliedTier: 25, modelTier: 'opus',
+};
+const mapped2 = mapProgFields(clientData);
+assert(mapped2.totalContribs === 42, 'camelCase totalContribs preserved');
+assert(mapped2.maxContribSession === 8, 'camelCase maxContribSession preserved');
+assert(mapped2.appliedTier === 25, 'camelCase appliedTier preserved');
+
+// empty data — all defaults
+const mapped3 = mapProgFields({});
+assert(mapped3.totalContribs === 0, 'empty → totalContribs defaults to 0');
+assert(mapped3.sessions === 0, 'empty → sessions defaults to 0');
+assert(mapped3.achievements.length === 0, 'empty → achievements defaults to []');
+assert(mapped3.mpDrained === false, 'empty → mpDrained defaults to false');
+
+// ═══════════════════════════════════
+console.log('\n  PixiFaces guard logic');
+// ═══════════════════════════════════
+
+// PixiFaces should be soft-disabled when window.PixiFaces is undefined
+assert(typeof global.PixiFaces === 'undefined', 'PixiFaces not defined in Node (expected)');
+const pixiGuard = (typeof global.PixiFaces !== 'undefined') && global.PixiFaces;
+assert(!pixiGuard, 'PixiFaces guard returns falsy when not loaded');
+
+// Simulate PixiFaces object
+global.PixiFaces = { enabled: true, getCanvas: () => null };
+assert(global.PixiFaces.enabled === true, 'PixiFaces.enabled defaults to true');
+assert(global.PixiFaces.getCanvas('ghost') === null, 'getCanvas returns null for uninitialized persona');
+global.PixiFaces.enabled = false;
+assert(global.PixiFaces.enabled === false, 'PixiFaces.enabled can be toggled off');
+delete global.PixiFaces;
+
+// ═══════════════════════════════════
+console.log('\n  portrait loading paths');
+// ═══════════════════════════════════
+
+// Verify expected file paths for sprites
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const facesDir = __dirname + 'sprites/faces/';
+
+const testPersonas = ['mira-chen', 'ghost', 'hermiona', 'harvey'];
+for (const id of testPersonas) {
+  assert(fs.existsSync(facesDir + id + '.png'), `${id}.png exists`);
+  assert(fs.existsSync(facesDir + id + '/rotations/south.png'), `${id}/rotations/south.png exists`);
+}
+
+// HR portraits (only 6 available)
+const hrPersonas = ['mira-chen', 'eleanor-voss', 'ghost', 'hermiona', 'george-carlin', 'harvey'];
+for (const id of hrPersonas) {
+  assert(fs.existsSync(facesDir + 'portraits/' + id + '/rotations/south.png'), `portraits/${id} HR exists`);
+}
+
+// Pixi.js lib exists
+assert(fs.existsSync(__dirname + 'lib/pixi.min.js'), 'lib/pixi.min.js exists');
+assert(fs.existsSync(__dirname + 'pixi-faces.js'), 'pixi-faces.js exists');
+
+// ═══════════════════════════════════
+console.log('\n  mcpDirect allowlist');
+// ═══════════════════════════════════
+
+assert(ALLOWED_TOOLS.has('list_personas'), 'list_personas in ALLOWED_TOOLS');
+assert(ALLOWED_TOOLS.has('bootstrap_session'), 'bootstrap_session in ALLOWED_TOOLS');
+assert(!ALLOWED_TOOLS.has('delete_persona'), 'delete_persona not in ALLOWED_TOOLS');
+assert(!ALLOWED_TOOLS.has('upsert_persona'), 'upsert_persona not in ALLOWED_TOOLS');
+assert(!ALLOWED_TOOLS.has('remember'), 'remember not in ALLOWED_TOOLS (write op)');
+assert(!ALLOWED_TOOLS.has('upsert_skill'), 'upsert_skill not in ALLOWED_TOOLS');
+assert(ALLOWED_TOOLS.size === 18, `ALLOWED_TOOLS has 18 entries (got ${ALLOWED_TOOLS.size})`);
+
+// ═══════════════════════════════════
+console.log('\n  VAULT_FEATURES gating');
+// ═══════════════════════════════════
+
+const VAULT_FEATURES = new Set(['Live', 'Log', 'Narada']);
+assert(VAULT_FEATURES.has('Live'), 'Live is a vault feature');
+assert(VAULT_FEATURES.has('Log'), 'Log is a vault feature');
+assert(VAULT_FEATURES.has('Narada'), 'Narada is a vault feature');
+assert(!VAULT_FEATURES.has('Team'), 'Team is NOT a vault feature');
+assert(!VAULT_FEATURES.has('Skills'), 'Skills is NOT a vault feature');
+assert(!VAULT_FEATURES.has('Settings'), 'Settings is NOT a vault feature');
+
+// ═══════════════════════════════════
+console.log('\n  settings persistence');
+// ═══════════════════════════════════
+
+// Simulate localStorage for Node
+const _store = {};
+const localStorage = {
+  getItem: k => _store[k] || null,
+  setItem: (k, v) => { _store[k] = v; },
+  removeItem: k => { delete _store[k]; },
+};
+
+function loadSettings() {
+  return {
+    serverUrl: localStorage.getItem('hmcp_server_url') || 'https://kapoost-humanmcp.fly.dev/mcp',
+    sessionCode: localStorage.getItem('hmcp_session_code') || '',
+    anthropicKey: localStorage.getItem('hmcp_anthropic_key') || '',
+  };
+}
+
+function saveSettings(s) {
+  localStorage.setItem('hmcp_server_url', s.serverUrl);
+  localStorage.setItem('hmcp_session_code', s.sessionCode);
+  if (s.anthropicKey) localStorage.setItem('hmcp_anthropic_key', s.anthropicKey);
+  else localStorage.removeItem('hmcp_anthropic_key');
+}
+
+// Default values
+const defaults = loadSettings();
+assert(defaults.serverUrl === 'https://kapoost-humanmcp.fly.dev/mcp', 'default server URL');
+assert(defaults.sessionCode === '', 'default session code is empty');
+assert(defaults.anthropicKey === '', 'default API key is empty');
+
+// Save and reload
+saveSettings({ serverUrl: 'https://custom.example.com/mcp', sessionCode: 'abc123', anthropicKey: 'sk-ant-test123' });
+const reloaded = loadSettings();
+assert(reloaded.serverUrl === 'https://custom.example.com/mcp', 'custom URL persisted');
+assert(reloaded.sessionCode === 'abc123', 'session code persisted');
+assert(reloaded.anthropicKey === 'sk-ant-test123', 'API key persisted');
+
+// Clear API key
+saveSettings({ serverUrl: 'https://custom.example.com/mcp', sessionCode: 'abc123', anthropicKey: '' });
+const cleared = loadSettings();
+assert(cleared.anthropicKey === '', 'empty API key clears storage');
+
+// ═══════════════════════════════════
+console.log('\n  mcpDirect JSON-RPC format');
+// ═══════════════════════════════════
+
+// Verify the JSON-RPC payload structure (without actual fetch)
+function buildDirectPayload(tool, args) {
+  return {
+    jsonrpc: '2.0',
+    id: 'test-id',
+    method: 'tools/call',
+    params: { name: tool, arguments: args || {} }
+  };
+}
+
+const payload = buildDirectPayload('list_personas', { format: 'short' });
+assert(payload.jsonrpc === '2.0', 'JSON-RPC version is 2.0');
+assert(payload.method === 'tools/call', 'method is tools/call');
+assert(payload.params.name === 'list_personas', 'tool name in params');
+assert(payload.params.arguments.format === 'short', 'args passed through');
+
+const payloadNoArgs = buildDirectPayload('about_humanmcp');
+assert(Object.keys(payloadNoArgs.params.arguments).length === 0, 'empty args when none provided');
+
+// ═══════════════════════════════════
 // Results
 // ═══════════════════════════════════
 

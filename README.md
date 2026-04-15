@@ -38,22 +38,23 @@ npm run dev
 
 ## Architecture
 
+The client supports two connection modes:
+
 ```
-Browser (Canvas 2D)          Proxy (Node.js)           MCP Server
-┌─────────────────┐    POST /call + Bearer    ┌──────────────┐    JSON-RPC    ┌──────────┐
-│  index.html      │ ──────────────────────── │  proxy.js     │ ────────────── │ humanMCP │
-│  engine.js       │    { tool, args }        │  :3001        │  tools/call   │ (remote) │
-│  sprites/faces/  │ ◄─────────────────────── │               │ ◄──────────── │          │
-└─────────────────┘    { ok, result }         └──────────────┘               └──────────┘
+Mode A — Local (with proxy)
+Browser ──► proxy.js (:3001) ──► humanMCP (fly.dev)
+                │
+                └──► mysloodsiewnia (:7331)  ← optional, unlocks Live/Log/Narada
+
+Mode B — Direct (GitHub Pages)
+Browser ──► humanMCP (fly.dev)   ← JSON-RPC over CORS
 ```
 
-The proxy exists because browsers can't call MCP servers directly (CORS). It adds a security layer:
+**Mode A** uses a local Node.js proxy for security (bearer token, tool allowlist, body size limit). When available, it also connects to mysloodsiewnia for local-only features.
 
-- **Bearer token** — random token generated at startup, required for all requests
-- **Tool allowlist** — only safe, read-oriented tools are proxied
-- **CORS restriction** — only configured origin allowed
-- **Body size limit** — 10KB max request body
-- **CSP headers** — Content Security Policy in index.html
+**Mode B** connects directly to the MCP server via JSON-RPC. No proxy needed — humanMCP-go has CORS enabled (`Access-Control-Allow-Origin: *`). This is what GitHub Pages uses.
+
+The client auto-detects which mode to use: it probes the proxy first, and falls back to direct connection if the proxy is offline.
 
 ## Proxy Options
 
@@ -81,28 +82,53 @@ Pressing Enter while text is typing completes it instantly. Next Enter advances 
 
 ## Connecting to Any humanMCP Server
 
-This client is generic — it works with any humanMCP server. On the Connect screen:
+This client is generic — it works with any humanMCP server.
 
-1. Enter the MCP server URL (e.g. `https://your-name-humanmcp.fly.dev/mcp`)
-2. Enter the proxy token (shown in proxy.js console output)
-3. Press Enter to connect
+**With proxy (local):**
+1. Start `node proxy.js`
+2. Enter the proxy token on the Connect screen
+3. Press Enter
+
+**Without proxy (GitHub Pages / direct):**
+1. Open Settings from the menu (or press S)
+2. Enter the MCP server URL (e.g. `https://your-name-humanmcp.fly.dev/mcp`)
+3. Enter a session code (optional — unlocks full team and skills)
+4. Press Enter to save — the client connects directly via JSON-RPC
 
 ## Sprites
 
 Character portraits are 48px pixel art in chibi proportions, generated with [PixelLab](https://pixellab.ai). Each persona has a 4-direction sprite sheet stored in `sprites/faces/`.
 
+## Testing
+
+```bash
+# Node tests (pure functions — no browser needed)
+npm test
+
+# Browser tests (rendering, input, network, live session)
+npm start
+npm run test:browser
+# or: open http://localhost:8080/test-browser.html
+```
+
+Node tests cover pure logic (hashing, parsing, allowlist). Browser tests cover all 15 scenes, keyboard/touch input, fetch/WebSocket mocks, MediaRecorder lifecycle, state bounds, paste handling, error paths, and CSP compliance.
+
 ## Project Structure
 
 ```
 humanmcp-rpg/
-├── index.html        # Entry point with CSP
-├── engine.js         # Game engine — all scenes, rendering, input, audio
-├── proxy.js          # Node.js MCP proxy with auth
+├── index.html         # Entry point with CSP
+├── engine.js          # Game engine — all scenes, rendering, input, audio
+├── proxy.js           # Node.js MCP proxy with auth
+├── test.js            # Node unit tests (pure functions)
+├── test-browser.html  # Browser test runner
+├── test-browser.js    # Browser test assertions (~90 tests)
+├── test-mocks.js      # Browser API mocks (fetch, WS, MediaRecorder, etc.)
 ├── package.json
 ├── sprites/
-│   └── faces/        # Persona portrait sprites (48px PNG)
+│   └── faces/         # Persona portrait sprites (48px PNG)
 └── content/
-    └── ireland.jpg   # Extracted MCP blob
+    └── ireland.jpg    # Extracted MCP blob
 ```
 
 ## Stack
@@ -115,10 +141,58 @@ humanmcp-rpg/
 
 ## GitHub Pages
 
-The static client (`index.html`, `engine.js`, `sprites/`) can be hosted on GitHub Pages.
-The proxy must run separately (e.g. on a VPS, Fly.io, or locally).
+The static client works on GitHub Pages without any backend. It connects directly to the humanMCP server via JSON-RPC.
 
 To enable: Settings > Pages > Source: Deploy from branch > `main` > `/ (root)`.
+
+### What works on GitHub Pages
+
+| Feature | GitHub Pages | Local (with proxy + mysloodsiewnia) |
+|---------|:-----------:|:-----------------------------------:|
+| Team (personas) | works | works |
+| Skills | works | works |
+| Library (poems) | works | works |
+| About (author profile) | works | works |
+| Vault Search | works (via humanMCP) | works (local + humanMCP) |
+| Message | works | works |
+| Bootstrap Session | works | works |
+| Settings | works | works |
+| Quest Log | -- | works (requires mysloodsiewnia) |
+| Live Transcription | -- | works (requires mysloodsiewnia) |
+| Narada (team brainstorm) | -- | works (requires mysloodsiewnia) |
+
+Features marked `--` are greyed out in the menu with a "(local)" label. Selecting them shows a message explaining they require mysloodsiewnia.
+
+### Settings panel
+
+The Settings scene (accessible from the menu) lets users configure:
+
+- **Server URL** — which humanMCP server to connect to (default: `kapoost-humanmcp.fly.dev/mcp`)
+- **Session code** — unlocks full personas and skills
+- **Anthropic API key** — stored for future Narada-via-API support
+
+All settings persist in `localStorage` across sessions.
+
+### How it works for visitors
+
+A visitor on GitHub Pages:
+1. Opens the page — client probes for local proxy (fails) and connects directly to fly.dev
+2. Browses Team, Skills, Library, Vault, About — all work via direct JSON-RPC
+3. Opens Settings to enter a session code — unlocks full team prompts and skills
+4. Live/Log/Narada are greyed out — these need mysloodsiewnia running locally
+
+### mysloodsiewnia integration
+
+[mysloodsiewnia](https://github.com/kapoost/mysloodsiewnia) is the local knowledge base / vault server. It provides:
+
+- **Live Transcription** — real-time meeting recording with Whisper, persona commentary, mood analysis, speaker identification
+- **Quest Log** — browse past meeting transcripts and AI-generated briefs
+- **Narada** — team brainstorm sessions where all personas discuss a topic using local Ollama models
+- **Local Vault** — search documents, notes, lexicon entries with embeddings (Ollama + nomic-embed-text)
+- **Persona state sync** — active/inactive persona toggles persist to vault
+- **Progression sync** — XP, achievements, and session stats sync between localStorage and vault
+
+These features require mysloodsiewnia running on `localhost:7331` with Ollama on `:11434`. They are only available when running the client locally with the proxy.
 
 ## Related
 
