@@ -679,6 +679,7 @@ const state = {
   typewriter: null,      // current typewriter animation
   menuCursor: 0,
   menuItems: [],
+  consoleLogs: [],       // ring buffer of console messages [{text, time, color}]
   dialogQueue: [],       // queue of dialog entries to show
   currentDialog: null,   // { persona, text, displayedText, charIndex, done }
   teamScroll: 0,
@@ -847,6 +848,13 @@ async function launcherProbe() {
   ];
 
   await Promise.allSettled(probes);
+
+  // Log probe results
+  const s = state._launcherStatus;
+  if (s.proxy === 'online') logConsole('Proxy online :3001', '#44dd88');
+  if (s.vault === 'online') logConsole('my\u015bloodsiewnia online :7331', '#44dd88');
+  else if (s.vault === 'offline') logConsole('my\u015bloodsiewnia offline', COLORS.textDisabled);
+  if (s.ollama === 'online') logConsole('Ollama online :11434', '#44dd88');
 
   // Mark ready but don't auto-connect — user presses ENTER
   if (state._launcherStatus.proxy === 'online' && state.proxyToken) {
@@ -1054,6 +1062,48 @@ function update(dt) {
   }
 }
 
+// ── Console Log ──
+
+const CONSOLE_MAX = 50;
+
+function logConsole(text, color) {
+  state.consoleLogs.push({ text, time: Date.now(), color: color || COLORS.textDisabled });
+  if (state.consoleLogs.length > CONSOLE_MAX) state.consoleLogs.shift();
+}
+
+function renderConsole() {
+  const logH = 44;
+  const logY = BASE_H - 28 - logH - 2;
+  drawBox(10, logY, BASE_W - 20, logH);
+
+  // Show last N lines that fit
+  const lineH = 10;
+  const maxLines = Math.floor((logH - 8) / lineH);
+  const logs = state.consoleLogs.slice(-maxLines);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(12, logY + 2, BASE_W - 24, logH - 4);
+  ctx.clip();
+
+  logs.forEach((entry, i) => {
+    const ly = logY + 10 + i * lineH;
+    const age = Date.now() - entry.time;
+    const alpha = age < 10000 ? 1.0 : Math.max(0.4, 1.0 - (age - 10000) / 30000);
+    ctx.globalAlpha = alpha;
+    // timestamp
+    const ts = new Date(entry.time);
+    const timeStr = String(ts.getHours()).padStart(2, '0') + ':' + String(ts.getMinutes()).padStart(2, '0') + ':' + String(ts.getSeconds()).padStart(2, '0');
+    drawText(timeStr, 16, ly, COLORS.textDisabled, 7);
+    // message (truncate to fit)
+    const msg = entry.text.length > 55 ? entry.text.slice(0, 52) + '...' : entry.text;
+    drawText(msg, 60, ly, entry.color, 8);
+  });
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function render() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, BASE_W, BASE_H);
@@ -1083,6 +1133,11 @@ function render() {
     case 'narada': renderNarada(); break;
     case 'live': renderLive(); break;
     case 'live-summary': renderLiveSummary(); break;
+  }
+
+  // ── Console log overlay (menu and sub-scenes) ──
+  if (state.consoleLogs.length > 0 && state.scene === 'menu') {
+    renderConsole();
   }
 
   // ── Battle encounter overlay ──
@@ -1981,7 +2036,8 @@ function renderMenu() {
   // team preview panel
   const panelX = 180;
   const panelW = BASE_W - 190;
-  const panelH = BASE_H - menuY - 8;
+  const consoleH = state.consoleLogs.length > 0 ? 48 : 0;
+  const panelH = BASE_H - menuY - 36 - consoleH;
   drawBox(panelX, menuY, panelW, panelH);
 
   drawText('Party', panelX + 10, menuY + 18, COLORS.textHighlight, 10);
@@ -2844,6 +2900,7 @@ function handleSettingsInput(e) {
       state.connected = false;
       connectToServer(s.serverUrl);
     }
+    logConsole('Settings saved to localStorage', '#44dd88');
     showDialog('mira-chen', 'Settings saved.');
     return;
   }
@@ -2981,17 +3038,24 @@ async function mcpCall(tool, args = {}) {
       const text = await resp.text();
       if (text.length > MAX_RESPONSE) throw new Error('Response too large');
       const data = JSON.parse(text);
-      if (data.ok) return data.result;
+      if (data.ok) {
+        logConsole(`proxy: ${tool} OK`, '#44dd88');
+        return data.result;
+      }
       throw new Error(data.error || 'MCP call failed');
     } catch (e) {
+      logConsole(`proxy: ${tool} failed — ${e.message}`, '#ff6666');
       console.warn(`MCP proxy call ${tool} failed:`, e.message);
     }
   }
   // Fallback to direct MCP
   if (state.serverUrl) {
     try {
-      return await mcpDirect(state.serverUrl, tool, args);
+      const result = await mcpDirect(state.serverUrl, tool, args);
+      logConsole(`direct: ${tool} OK`, '#44dd88');
+      return result;
     } catch (e) {
+      logConsole(`direct: ${tool} failed — ${e.message}`, '#ff6666');
       console.warn(`MCP direct call ${tool} failed:`, e.message);
     }
   }
@@ -2999,6 +3063,7 @@ async function mcpCall(tool, args = {}) {
 }
 
 async function connectToServer(url) {
+  logConsole('Connecting to ' + url.replace('https://', ''), COLORS.text);
   state.serverUrl = url;
 
   // try proxy first
@@ -3009,6 +3074,7 @@ async function connectToServer(url) {
       state.connected = true;
       state.proxyAvailable = true;
       state.scene = 'menu';
+      logConsole('Connected via proxy :3001', '#44dd88');
 
       // fetch live data in parallel
       fetchPersonas();
@@ -3027,7 +3093,9 @@ async function connectToServer(url) {
       showDialog('mira-chen', msg);
       return;
     }
-  } catch (_) {}
+  } catch (_) {
+    logConsole('Proxy unavailable, trying direct...', '#ffcc44');
+  }
 
   // fallback — try direct MCP connection
   state.proxyAvailable = false;
@@ -3036,6 +3104,7 @@ async function connectToServer(url) {
     await mcpDirect(url, 'about_humanmcp', {});
     state.connected = true;
     state.scene = 'menu';
+    logConsole('Connected directly (no proxy)', '#44dd88');
     const serverName = url.replace('https://', '').replace('http://', '').split('.')[0].split('/')[0];
     showDialog('mira-chen', `Connected directly to ${serverName} (no proxy). Loading...`);
     fetchPersonas();
@@ -3043,9 +3112,12 @@ async function connectToServer(url) {
     fetchAuthorProfile();
     if (state.sessionCode) bootstrapSession(state.sessionCode);
     return;
-  } catch (_) {}
+  } catch (_) {
+    logConsole('Direct connection failed', '#ff6666');
+  }
 
   // truly offline
+  logConsole('Offline mode — no server reachable', '#ff6666');
   state.connected = true;
   state.scene = 'menu';
   showDialog('ghost', `No server reachable. Running in offline mode with cached data. Press ESC and R to retry.`);
@@ -3181,6 +3253,7 @@ async function bootstrapSession(code) {
   state.bootstrapped = true;
   // unlock skills after bootstrap
   SKILLS.forEach(s => { s.locked = false; });
+  logConsole('Session bootstrapped — full access', '#44dd88');
   showDialog('zara', 'Session unlocked. Full team and skills available.');
 }
 
@@ -3683,6 +3756,7 @@ function handleMenuSelect() {
   // Block vault-only features when vault offline
   if (VAULT_FEATURES.has(label) && state._launcherStatus.vault !== 'online') {
     playSfx('locked');
+    logConsole(label + ' blocked — requires my\u015bloodsiewnia', '#ff6666');
     showDialog('ghost', 'Ta funkcja wymaga lokalnej my\u015bloodsiewni. Uruchom serwer vault i spr\u00f3buj ponownie.');
     return;
   }
@@ -5229,7 +5303,7 @@ function renderLiveSummary() {
 }
 
 // ── Test Export ──
-window.__TEST__ = { state, PERSONAS, SKILLS, COLORS, handleKey, handleSelect, handlePaste, showDialog, mcpCall, mcpDirect, connectToServer, fetchPersonas, fetchSkills, startLiveSession, stopLiveSession, render, addBubble, loadProgression, saveProgression, awardXP, ACHIEVEMENTS, ALLOWED_TOOLS, VAULT_FEATURES, loadSettings, saveSettings };
+window.__TEST__ = { state, PERSONAS, SKILLS, COLORS, handleKey, handleSelect, handlePaste, showDialog, mcpCall, mcpDirect, connectToServer, fetchPersonas, fetchSkills, startLiveSession, stopLiveSession, render, addBubble, loadProgression, saveProgression, awardXP, ACHIEVEMENTS, ALLOWED_TOOLS, VAULT_FEATURES, loadSettings, saveSettings, logConsole };
 
 // ── Start ──
 

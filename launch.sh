@@ -31,6 +31,10 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
+GITHUB_PAGES="https://kapoost.github.io/humanmcp-rpg"
+GITHUB_REPO="https://github.com/kapoost/humanmcp-rpg"
+MCP_SERVER="https://kapoost-humanmcp.fly.dev/mcp"
+
 header() {
   clear
   echo -e "${B}"
@@ -139,6 +143,11 @@ case "$choice" in
   echo -e "  ${G}Open: ${W}http://localhost:$RPG_PORT${N}"
   echo -e "  ${D}Proxy token printed above — paste it in the Connect screen${N}"
   echo ""
+  echo -e "  ${C}Links:${N}"
+  echo -e "  ${D}GitHub Pages:  ${W}$GITHUB_PAGES${N}"
+  echo -e "  ${D}MCP Server:    ${W}$MCP_SERVER${N}"
+  echo -e "  ${D}Repository:    ${W}$GITHUB_REPO${N}"
+  echo ""
   echo -e "  ${D}Press Ctrl+C to stop all services${N}"
   echo ""
 
@@ -209,6 +218,11 @@ case "$choice" in
   echo ""
   echo -e "  ${G}Open: ${W}http://localhost:$RPG_PORT${N}"
   echo -e "  ${D}Proxy token printed above — paste it in the Connect screen${N}"
+  echo ""
+  echo -e "  ${C}Links:${N}"
+  echo -e "  ${D}GitHub Pages:  ${W}$GITHUB_PAGES${N}"
+  echo -e "  ${D}MCP Server:    ${W}$MCP_SERVER${N}"
+  echo -e "  ${D}Repository:    ${W}$GITHUB_REPO${N}"
   echo ""
   echo -e "  ${D}Press Ctrl+C to stop all services${N}"
   echo ""
@@ -287,6 +301,12 @@ case "$choice" in
   else
     echo -e "  ${R}○${N} ${D}humanMCP Server $MCP_URL (unreachable)${N}"
   fi
+
+  echo ""
+  echo -e "  ${C}Links:${N}"
+  echo -e "  ${D}GitHub Pages:  ${W}$GITHUB_PAGES${N}"
+  echo -e "  ${D}MCP Server:    ${W}$MCP_SERVER${N}"
+  echo -e "  ${D}Repository:    ${W}$GITHUB_REPO${N}"
   echo ""
   ;;
 
